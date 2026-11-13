@@ -26,13 +26,17 @@ ns.AddLocale("en", {
     mana = "Mana", rage = "Rage", energy = "Energy", other = "Other resources",
     prd_opacity = "Opacity:",
     prd_inCombat = "  In combat", prd_regen = "  Regenerating", prd_full = "  Full bars",
-    prd_maxDelay = "Max wait",
+    prd_maxDelay = "Initial wait",
+    prd_margin = "Margin after last pulse",
     prd_st_disabled = "disabled", prd_st_combat = "combat", prd_st_regen = "regenerating", prd_st_idle = "idle",
     prd_r_disabled = "module disabled", prd_r_combat = "in combat", prd_r_dead = "dead",
     prd_r_partial = "bars not full", prd_r_full = "bars full",
     prd_r_health = "health changing", prd_r_power = "%s changing", prd_r_none = "no changes",
     prd_status = "Personal Resource Display: %s (%d%%) | reason: %s | resource: %s",
     prd_debug = "health: last event %.1fs ago, visible %.1fs more | resource: last event %.1fs ago, visible %.1fs more",
+    prd_method = "detection: %s | health rhythm: %s (+%.1fs learned) | resource rhythm: %s (+%.1fs learned)",
+    prd_m_values = "exact (values)", prd_m_bars = "exact (bar fill)", prd_m_activity = "activity",
+    prd_unknown = "unknown",
 })
 ns.AddLocale("es", {
     tab_prd = "Recursos",
@@ -43,13 +47,17 @@ ns.AddLocale("es", {
     mana = "Maná", rage = "Rabia", energy = "Energía", other = "Otros recursos",
     prd_opacity = "Opacidad:",
     prd_inCombat = "  En combate", prd_regen = "  Regenerando", prd_full = "  Barras llenas",
-    prd_maxDelay = "Espera máxima",
+    prd_maxDelay = "Espera inicial",
+    prd_margin = "Margen tras el último pulso",
     prd_st_disabled = "desactivado", prd_st_combat = "combate", prd_st_regen = "regenerando", prd_st_idle = "en reposo",
     prd_r_disabled = "módulo desactivado", prd_r_combat = "en combate", prd_r_dead = "muerto",
     prd_r_partial = "barras incompletas", prd_r_full = "barras llenas",
     prd_r_health = "vida cambiando", prd_r_power = "%s cambiando", prd_r_none = "sin cambios",
     prd_status = "Personal Resource Display: %s (%d%%) | motivo: %s | recurso: %s",
     prd_debug = "vida: último evento hace %.1fs, visible %.1fs más | recurso: último evento hace %.1fs, visible %.1fs más",
+    prd_method = "detección: %s | ritmo de vida: %s (+%.1fs aprendido) | ritmo de recurso: %s (+%.1fs aprendido)",
+    prd_m_values = "exacta (valores)", prd_m_bars = "exacta (relleno de barra)", prd_m_activity = "actividad",
+    prd_unknown = "desconocido",
 })
 
 local mod = {
@@ -59,6 +67,7 @@ local mod = {
         health = true,
         power = { mana = true, rage = true, energy = true, other = true },
         maxDelay = 6,
+        margin = 3, -- tenths of a second added after the expected next pulse
         alphaCombat = 100,
         alphaRegen = 50,
         alphaIdle = 0,
@@ -79,9 +88,10 @@ local nextCheck = math.huge
 local targetAlpha  -- opacity the display is fading toward
 
 local track = {
-    health = { last = 0, untilTime = 0 },
-    power  = { last = 0, untilTime = 0 },
+    health = { last = 0, untilTime = 0, intervals = {}, learned = 0 },
+    power  = { last = 0, untilTime = 0, intervals = {}, learned = 0 },
 }
+local lastMethod = "prd_m_activity"
 
 local function IsSecret(v)
     return issecretvalue and issecretvalue(v)
@@ -91,18 +101,106 @@ local function PowerKey()
     return POWER_KEYS[UnitPowerType("player")] or "other"
 end
 
+-- Regeneration comes in pulses. The wait after the last pulse is the usual
+-- interval between pulses (the median of the last three, so one odd interval
+-- doesn't change it) plus a small margin set by the user. The "Initial wait"
+-- setting is only used until the rhythm is known.
+local RHYTHM_LIMIT = 10   -- intervals longer than this mean regeneration stopped
+local DUPLICATE = 0.05    -- events this close together belong to the same pulse
+local LEARN_MAX = 1.5     -- most extra wait the addon can learn (seconds)
+local LEARN_STEP = 0.1    -- extra added on top of a late pulse's delay
+local LEARN_DECAY = 0.97  -- each on-time pulse keeps 97% of the learned wait
+
+local function Rhythm(t)
+    local n = #t.intervals
+    if n == 0 then return 0 end
+    local sorted = {}
+    for i, v in ipairs(t.intervals) do sorted[i] = v end
+    table.sort(sorted)
+    if n % 2 == 1 then return sorted[(n + 1) / 2] end
+    return (sorted[n / 2] + sorted[n / 2 + 1]) / 2
+end
+
+-- Learning: if a pulse arrives after the wait ran out (so the display already
+-- hid while still regenerating), the delay is learned and added to the next
+-- waits. Pulses that arrive on time slowly shrink what was learned.
 local function MarkActivity(t)
     local now = GetTime()
     local interval = now - t.last
+    local previousUntil = t.untilTime
     t.last = now
-    local maxDelay = mod.db.maxDelay
+    if interval > RHYTHM_LIMIT then
+        wipe(t.intervals) -- a new regeneration started
+    elseif interval > DUPLICATE then
+        local rhythm = Rhythm(t)
+        if rhythm > 0 and now > previousUntil and interval < rhythm * 2
+            and not InCombatLockdown() then
+            -- Late pulse: the display hid too early.
+            t.learned = math.min(LEARN_MAX, t.learned + (now - previousUntil) + LEARN_STEP)
+        else
+            t.learned = t.learned * LEARN_DECAY
+        end
+        table.insert(t.intervals, interval)
+        if #t.intervals > 3 then table.remove(t.intervals, 1) end
+    end
+    local rhythm = Rhythm(t)
     local timeout
-    if interval < maxDelay then
-        timeout = math.max(1, math.min(maxDelay, interval * 1.5 + 0.25))
+    if rhythm > 0 then
+        timeout = math.min(RHYTHM_LIMIT, rhythm * 1.05 + mod.db.margin / 10 + t.learned)
     else
-        timeout = maxDelay
+        timeout = mod.db.maxDelay
     end
     t.untilTime = math.max(t.untilTime, now + timeout)
+end
+
+-- Fraction (0 to 1) of a status bar that is filled, read from the size of its
+-- fill on screen. nil if the game keeps that secret too.
+local function BarFill(bar)
+    if not bar or not bar.GetStatusBarTexture then return nil end
+    local ok, fill = pcall(function()
+        local texture = bar:GetStatusBarTexture()
+        if not texture then return nil end
+        local barWidth, fillWidth = bar:GetWidth(), texture:GetWidth()
+        if IsSecret(barWidth) or IsSecret(fillWidth) then return nil end
+        if barWidth <= 0 then return nil end
+        local shown = texture:IsShown()
+        if IsSecret(shown) then return nil end
+        if not shown then return 0 end
+        return fillWidth / barWidth
+    end)
+    if ok then return fill end
+    return nil
+end
+
+local function HealthBar()
+    return prd and prd.HealthBarsContainer and prd.HealthBarsContainer.healthBar
+end
+
+local function PowerBar()
+    return prd and prd.PowerBar
+end
+
+-- Second exact method: true/false from the bars' fill, nil if not readable.
+local function BarCheck()
+    local db = mod.db
+    if db.health then
+        local fill = BarFill(HealthBar())
+        if fill == nil then return nil end
+        if fill < 0.995 then return true end
+    end
+    if db.power[PowerKey()] then
+        local bar = PowerBar()
+        if bar and bar:IsShown() then
+            local fill = BarFill(bar)
+            if fill == nil then return nil end
+            if DECAY_POWER[UnitPowerType("player")] then
+                if fill > 0.005 then return true end
+            elseif fill < 0.995 then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- true/false if values are readable, nil if they are secret.
@@ -140,9 +238,16 @@ local function GetState()
 
     local exact = ExactCheck()
     if exact ~= nil then
+        lastMethod = "prd_m_values"
+    else
+        exact = BarCheck()
+        if exact ~= nil then lastMethod = "prd_m_bars" end
+    end
+    if exact ~= nil then
         lastReason = exact and L.prd_r_partial or L.prd_r_full
         return exact and "regen" or "idle"
     end
+    lastMethod = "prd_m_activity"
 
     local now = GetTime()
     if db.health and now < track.health.untilTime then
@@ -199,9 +304,11 @@ local function Apply()
     ApplyText(state)
 
     -- Next moment something can change without an event: the end of a
-    -- regeneration window.
+    -- regeneration window. With bar detection the bar can finish filling
+    -- between events, so it's checked again shortly while not full.
     local now = GetTime()
     nextCheck = math.huge
+    if lastMethod == "prd_m_bars" and state == "regen" then nextCheck = now + 0.2 end
     for _, t in pairs(track) do
         if t.untilTime > now and t.untilTime < nextCheck then nextCheck = t.untilTime end
     end
@@ -331,6 +438,11 @@ function mod.BuildOptions(parent, y)
     y = y - 10
     add(ns.CreateStepper(parent, L.prd_maxDelay, y,
         function() return db().maxDelay end, function(v) db().maxDelay = v end, 2, 15, 1, " s"))
+    y = y - 26
+    -- Stored in tenths so the stepper works with whole numbers.
+    add(ns.CreateStepper(parent, L.prd_margin, y,
+        function() return db().margin end, function(v) db().margin = v end, 0, 10, 1,
+        function(v) return string.format("%.1f s", v / 10) end))
 
     return function() for _, r in ipairs(refreshers) do r() end end
 end
@@ -347,12 +459,22 @@ function mod.PrintStatus()
         math.floor(TargetAlpha(state) * 100 + 0.5), lastReason, L[PowerKey()]))
 end
 
+local function RhythmText(t)
+    local rhythm = Rhythm(t)
+    if rhythm <= 0 then return L.prd_unknown end
+    return string.format("%.1fs", rhythm)
+end
+
 function mod.Command(cmd)
     if cmd == "debug" then
         local now = GetTime()
+        if prd then GetState() end -- updates the detection method
         ns.Print(string.format(L.prd_debug,
             now - track.health.last, math.max(0, track.health.untilTime - now),
             now - track.power.last, math.max(0, track.power.untilTime - now)))
+        ns.Print(string.format(L.prd_method, L[lastMethod],
+            RhythmText(track.health), track.health.learned,
+            RhythmText(track.power), track.power.learned))
         return true
     end
     return false

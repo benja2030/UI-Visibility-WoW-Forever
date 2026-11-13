@@ -214,7 +214,15 @@ function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, su
     value:SetJustifyH("CENTER")
     value:SetWidth(44)
 
-    local function Refresh() value:SetText(getter() .. suffix) end
+    -- "suffix" can be text added after the number, or a function that
+    -- formats the whole value.
+    local function Refresh()
+        if type(suffix) == "function" then
+            value:SetText(suffix(getter()))
+        else
+            value:SetText(getter() .. suffix)
+        end
+    end
 
     local minus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     minus:SetSize(24, 20)

@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: UI Visibility
 ## Notes: Controls when parts of the interface are visible: action bars, unit frames, chat, minimap and more.
-## Version: 1.2.1
+## Version: 1.2.4
 ## IconTexture: Interface\AddOns\UIVisibility\Media\Icon
 ## AddonCompartmentFunc: UIVisibility_OnAddonCompartmentClick
 ## SavedVariables: UIVisibilityDB
