@@ -5,6 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.PREFIX = "|cff33ff99UI Visibility:|r "
+ns.ICON = "Interface\\AddOns\\UIVisibility\\Media\\Icon"
 ns.TICK = 0.05      -- fast update interval (seconds), shared by all modules
 ns.SLOW_TICK = 5    -- slow update interval (seconds)
 ns.FADE_TIME = 0.2  -- duration of fades (seconds)
@@ -359,8 +360,12 @@ local function CreateWindow()
     tinsert(UISpecialFrames, "UIVisibilityWindow")
 
     local title = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOP", 0, -6)
+    title:SetPoint("TOP", 8, -6)
     title:SetText("UI Visibility")
+    local icon = window:CreateTexture(nil, "OVERLAY")
+    icon:SetSize(16, 16)
+    icon:SetPoint("RIGHT", title, "LEFT", -4, 0)
+    icon:SetTexture(ns.ICON)
 
     local width = (380 - 24 - (#ns.moduleList - 1) * 4) / #ns.moduleList
     for i, mod in ipairs(ns.moduleList) do
@@ -381,6 +386,16 @@ function ns.OpenWindow(key)
     SelectTab(key or ns.db.lastTab)
 end
 
+-- Called by the game when UI Visibility is clicked in the minimap's addon
+-- button (declared in the .toc with AddonCompartmentFunc).
+function UIVisibility_OnAddonCompartmentClick()
+    if window and window:IsShown() then
+        window:Hide()
+    else
+        ns.OpenWindow()
+    end
+end
+
 ---------------------------------------------------------------------------
 -- Pages in the game's Options > AddOns
 ---------------------------------------------------------------------------
@@ -391,11 +406,15 @@ local function RegisterSettings()
 
     local main = CreateFrame("Frame")
     main:Hide()
+    local mainIcon = main:CreateTexture(nil, "OVERLAY")
+    mainIcon:SetSize(32, 32)
+    mainIcon:SetPoint("TOPLEFT", 16, -10)
+    mainIcon:SetTexture(ns.ICON)
     local title = main:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetPoint("LEFT", mainIcon, "RIGHT", 8, 0)
     title:SetText("UI Visibility")
     local subtitle = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+    subtitle:SetPoint("TOPLEFT", mainIcon, "BOTTOMLEFT", 0, -6)
     subtitle:SetText(L.subtitle)
 
     local refreshers = {}
