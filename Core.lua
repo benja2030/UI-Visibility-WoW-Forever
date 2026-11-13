@@ -118,6 +118,12 @@ function ns.Resolve(path)
     return nil
 end
 
+-- Some frames answer with "secret" values that addons can't test (for
+-- example parts of the target frame). This tells if a value is one of them.
+function ns.IsSecret(v)
+    return issecretvalue ~= nil and issecretvalue(v)
+end
+
 local function EffectiveScale(obj)
     if obj.GetEffectiveScale then return obj:GetEffectiveScale() end
     local parent = obj:GetParent()
@@ -127,8 +133,12 @@ end
 -- True if the cursor is inside the object's rectangle on screen. Calculated
 -- directly because the game's MouseIsOver fails in Forever.
 function ns.IsCursorOver(obj)
-    if not obj:IsVisible() then return false end
+    local visible = obj:IsVisible()
+    if ns.IsSecret(visible) or not visible then return false end
     local left, bottom, width, height = obj:GetRect()
+    if ns.IsSecret(left) or ns.IsSecret(bottom) or ns.IsSecret(width) or ns.IsSecret(height) then
+        return false
+    end
     if not left then return false end
     local x, y = GetCursorPosition()
     local scale = EffectiveScale(obj)
@@ -147,6 +157,10 @@ end
 -- the fade is still in progress.
 function ns.Fade(obj, target)
     local current = obj:GetAlpha()
+    if ns.IsSecret(current) then
+        obj:SetAlpha(target) -- can't read it, so set it directly
+        return false
+    end
     local diff = target - current
     if math.abs(diff) < 0.001 then return false end
     local fadeTime = ns.FadeTime()

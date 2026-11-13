@@ -44,15 +44,18 @@ ns.AddLocale("es", {
     mm_manual = " (agregado por ti)",
 })
 
--- Day/night icon: it has no name, so it's found by position. It's the child
--- of the minimap container anchored to the minimap's top right corner.
+-- Day/night icon: it has no name, and other addons can move it, so it's
+-- recognized by what it is: a small child of the minimap container, other
+-- than the minimap itself, with its own background (.Background).
 local function FindDayNight()
     local container = MinimapCluster and MinimapCluster.MinimapContainer
     if not container then return {} end
     for _, child in ipairs({ container:GetChildren() }) do
-        if child ~= Minimap and child.Background then
-            local point, relativeTo = child:GetPoint(1)
-            if point == "TOPRIGHT" and relativeTo == Minimap then return { child } end
+        if child ~= Minimap and child.Background and not (child.IsForbidden and child:IsForbidden()) then
+            local width = child:GetWidth()
+            if not ns.IsSecret(width) and width > 0 and width < 80 then
+                return { child }
+            end
         end
     end
     return {}

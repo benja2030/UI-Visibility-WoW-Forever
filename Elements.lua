@@ -88,7 +88,9 @@ function ns.NewElementsModule(cfg)
         local list = disabledParts[frame]
         local function walk(f)
             if not f.GetChildren then return end
-            if f:IsMouseEnabled() then
+            -- A part whose answer is secret is left as it is.
+            local enabled = f:IsMouseEnabled()
+            if not ns.IsSecret(enabled) and enabled then
                 f:EnableMouse(false)
                 list[#list + 1] = f
             end
@@ -303,7 +305,7 @@ function ns.NewElementsModule(cfg)
                 detail = mode .. ", " .. L.notFound
             elseif element.multi then
                 detail = mode .. ", " .. string.format(L.st_found, #frames)
-            elseif not frame:IsShown() then
+            elseif not ns.IsSecret(frame:IsShown()) and not frame:IsShown() then
                 detail = mode .. ", " .. L.st_notShown
             elseif ns.IsEditMode() then
                 detail = L.st_edit
