@@ -1,0 +1,87 @@
+# Builds the addon zip and publishes a GitHub release.
+#
+# Two ways to start it:
+#   1. Push a tag:   git tag v1.2.0   then   git push origin v1.2.0
+#   2. From GitHub:  Actions tab > Release > Run workflow > type the version
+#
+# What it does:
+#   - Converts README.md into README.txt (plain text, readable in Notepad).
+#   - Copies the addon files into a UIVisibility folder.
+#   - Writes the version into the .toc inside the zip.
+#   - Zips the folder and publishes a release with the zip attached.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 1.2.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  ADDON: UIVisibility
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="$GITHUB_REF_NAME"
+          fi
+          VERSION="${VERSION#v}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            echo "The version must look like 1.2.0, but it is: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Build the addon folder
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          OUT="build/$ADDON"
+          mkdir -p "$OUT"
+
+          # Addon files
+          cp *.toc *.lua "$OUT/"
+          if [ -d Media ]; then cp -r Media "$OUT/"; fi
+          if [ -f LICENSE ]; then cp LICENSE "$OUT/LICENSE.txt"; fi
+
+          # README.md -> README.txt
+          pandoc README.md --from gfm --to plain --columns=78 --output "$OUT/README.txt"
+
+          # Version from the tag goes into the .toc
+          sed -i "s/^## Version:.*/## Version: $VERSION/" "$OUT/$ADDON.toc"
+
+          cd build
+          zip -r "../$ADDON-v$VERSION.zip" "$ADDON"
+          cd ..
+          unzip -l "$ADDON-v$VERSION.zip"
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: UI Visibility v${{ steps.version.outputs.version }}
+          files: ${{ env.ADDON }}-v${{ steps.version.outputs.version }}.zip
+          generate_release_notes: true

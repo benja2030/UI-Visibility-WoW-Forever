@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: UI Visibility
 ## Notes: Controls when parts of the interface are visible: Personal Resource Display, experience bar, class bars and minimap elements.
-## Version: 1.1.0
+## Version: 1.2.0
 ## IconTexture: Interface\AddOns\UIVisibility\Media\Icon
 ## AddonCompartmentFunc: UIVisibility_OnAddonCompartmentClick
 ## SavedVariables: UIVisibilityDB

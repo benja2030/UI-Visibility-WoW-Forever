@@ -41,8 +41,11 @@ ns.AddLocale("en", {
     enabled = "Enabled",
     modules = "Modules:",
     subtitle = "Controls when parts of the interface are visible.",
-    language = "Language: English",
+    languageLabel = "Language:",
     langReload = "language changed. Type /reload to apply it.",
+    langPopup = "The language changes after reloading the interface. Reload now?",
+    reloadNow = "Reload",
+    later = "Later",
     help = "Help",
     shown = "Shown", hidden = "Hidden", hover = "On hover",
     notFound = "not found",
@@ -64,8 +67,11 @@ ns.AddLocale("es", {
     enabled = "Activado",
     modules = "Módulos:",
     subtitle = "Controla cuándo se ven las partes de la interfaz.",
-    language = "Idioma: Español",
+    languageLabel = "Idioma:",
     langReload = "idioma cambiado. Escribe /reload para aplicarlo.",
+    langPopup = "El idioma cambia al recargar la interfaz. ¿Recargar ahora?",
+    reloadNow = "Recargar",
+    later = "Más tarde",
     help = "Ayuda",
     shown = "Visible", hidden = "Oculta", hover = "Con el mouse",
     notFound = "no encontrado",
@@ -303,20 +309,90 @@ function ns.ShowHelp()
     helpFrame:Show()
 end
 
--- Language and Help buttons, used at the bottom of the option pages.
-local function CreateBottomButtons(parent, anchorPoint, x, y)
-    local langButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    langButton:SetSize(170, 24)
-    langButton:SetPoint(anchorPoint, x, y)
-    langButton:SetText(L.language)
-    langButton:SetScript("OnClick", function()
-        ns.db.language = (ns.db.language == "en") and "es" or "en"
-        ns.Print(ns.LOCALES[ns.db.language].langReload)
+-- Language dropdown and Help button, used at the bottom of the option pages.
+-- Each language is listed in its own language, so it's easy to find.
+local LANGUAGES = {
+    { key = "en", name = "English" },
+    { key = "es", name = "Español" },
+}
+
+local function LanguageName(key)
+    for _, lang in ipairs(LANGUAGES) do
+        if lang.key == key then return lang.name end
+    end
+    return key
+end
+
+-- Texts are built when a window is created, so a new language needs a
+-- reload. The popup offers to do it right away.
+local function AskReload()
+    StaticPopupDialogs["UIVISIBILITY_RELOAD"] = {
+        text = ns.LOCALES[ns.db.language].langPopup,
+        button1 = ns.LOCALES[ns.db.language].reloadNow,
+        button2 = ns.LOCALES[ns.db.language].later,
+        OnAccept = function() ReloadUI() end,
+        OnCancel = function() ns.Print(ns.LOCALES[ns.db.language].langReload) end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    StaticPopup_Show("UIVISIBILITY_RELOAD")
+end
+
+local function SetLanguage(key)
+    if ns.db.language == key then return end
+    ns.db.language = key
+    AskReload()
+end
+
+local dropdownCount = 0
+
+-- Uses the game's current dropdown (WowStyle1DropdownTemplate). If this
+-- client doesn't have it, falls back to the older UIDropDownMenu.
+local function CreateLanguageDropdown(parent, label)
+    local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    if ok and dropdown and dropdown.SetupMenu then
+        dropdown:SetWidth(120)
+        dropdown:SetPoint("LEFT", label, "RIGHT", 8, 0)
+        dropdown:SetupMenu(function(_, root)
+            for _, lang in ipairs(LANGUAGES) do
+                root:CreateRadio(lang.name,
+                    function() return ns.db.language == lang.key end,
+                    function() SetLanguage(lang.key) end)
+            end
+        end)
+        return
+    end
+
+    dropdownCount = dropdownCount + 1
+    local legacy = CreateFrame("Frame", "UIVisibilityLanguageDropdown" .. dropdownCount, parent, "UIDropDownMenuTemplate")
+    legacy:SetPoint("LEFT", label, "RIGHT", -8, -2)
+    UIDropDownMenu_SetWidth(legacy, 110)
+    UIDropDownMenu_SetText(legacy, LanguageName(ns.db.language))
+    UIDropDownMenu_Initialize(legacy, function()
+        for _, lang in ipairs(LANGUAGES) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = lang.name
+            info.checked = ns.db.language == lang.key
+            info.func = function()
+                UIDropDownMenu_SetText(legacy, lang.name)
+                SetLanguage(lang.key)
+            end
+            UIDropDownMenu_AddButton(info)
+        end
     end)
+end
+
+local function CreateBottomButtons(parent, anchorPoint, x, y)
+    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint(anchorPoint, x, y + 6)
+    label:SetText(L.languageLabel)
+    CreateLanguageDropdown(parent, label)
 
     local helpButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     helpButton:SetSize(86, 24)
-    helpButton:SetPoint("LEFT", langButton, "RIGHT", 8, 0)
+    helpButton:SetPoint("LEFT", label, "LEFT", 220, 0)
     helpButton:SetText(L.help)
     helpButton:SetScript("OnClick", ns.ShowHelp)
 end
