@@ -8,7 +8,6 @@ ns.PREFIX = "|cff33ff99UI Visibility:|r "
 ns.ICON = "Interface\\AddOns\\UIVisibility\\Media\\Icon"
 ns.TICK = 0.05      -- fast update interval (seconds), shared by all modules
 ns.SLOW_TICK = 5    -- slow update interval (seconds)
-ns.FADE_TIME = 0.2  -- duration of fades (seconds)
 
 ns.moduleList = {}
 ns.moduleByKey = {}
@@ -47,6 +46,11 @@ ns.AddLocale("en", {
     reloadNow = "Reload",
     later = "Later",
     help = "Help",
+    tab_general = "General",
+    open = "Open",
+    fadeSmooth = "Fade smoothness",
+    fadeNote = "0 is instant. Higher numbers fade more slowly.",
+    instant = "Instant",
     shown = "Shown", hidden = "Hidden", hover = "On hover",
     notFound = "not found",
     helpTitle = "UI Visibility - Help",
@@ -59,7 +63,7 @@ ns.AddLocale("en", {
         .. "5. Save the file and restart the game.",
     helpCopy = "Click the box and press Ctrl+C to copy the command.",
     helpFooter = "If the addon doesn't load you can't open this window, so these steps are also in README.txt inside the addon folder.",
-    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv minimap, /uiv options, /uiv help, /uiv status",
+    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv options, /uiv help, /uiv status",
 })
 ns.AddLocale("es", {
     loaded = "activo. Escribe /uiv para abrir las opciones.",
@@ -73,6 +77,11 @@ ns.AddLocale("es", {
     reloadNow = "Recargar",
     later = "Más tarde",
     help = "Ayuda",
+    tab_general = "General",
+    open = "Abrir",
+    fadeSmooth = "Suavidad del fundido",
+    fadeNote = "0 es instantáneo. Números más altos se desvanecen más lento.",
+    instant = "Instantáneo",
     shown = "Visible", hidden = "Oculta", hover = "Con el mouse",
     notFound = "no encontrado",
     helpTitle = "UI Visibility - Ayuda",
@@ -85,7 +94,7 @@ ns.AddLocale("es", {
         .. "5. Guarda el archivo y reinicia el juego.",
     helpCopy = "Haz clic en el recuadro y presiona Ctrl+C para copiar el comando.",
     helpFooter = "Si el addon no carga no podrás abrir esta ventana, así que estos pasos también están en README.txt dentro de la carpeta del addon.",
-    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv minimap, /uiv opciones, /uiv ayuda, /uiv estado",
+    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv opciones, /uiv ayuda, /uiv estado",
 })
 
 function ns.Print(msg) print(ns.PREFIX .. msg) end
@@ -127,13 +136,25 @@ function ns.IsCursorOver(obj)
     return x >= left and x <= left + width and y >= bottom and y <= bottom + height
 end
 
+-- Fade duration in seconds, from the "Fade smoothness" setting (0 to 10):
+-- 0 is instant, each step adds 0.1 seconds.
+function ns.FadeTime()
+    local steps = ns.db and ns.db.fadeSmoothness or 2
+    return steps * 0.1
+end
+
 -- Moves an object's opacity one step toward the target. Returns true while
 -- the fade is still in progress.
 function ns.Fade(obj, target)
     local current = obj:GetAlpha()
     local diff = target - current
     if math.abs(diff) < 0.001 then return false end
-    local step = ns.TICK / ns.FADE_TIME
+    local fadeTime = ns.FadeTime()
+    if fadeTime <= 0 then
+        obj:SetAlpha(target)
+        return false
+    end
+    local step = ns.TICK / fadeTime
     if diff > step then diff = step elseif diff < -step then diff = -step end
     obj:SetAlpha(current + diff)
     return true
@@ -199,6 +220,32 @@ function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, su
     return Refresh
 end
 
+-- A slider from minV to maxV in steps of 1. Uses the game's current slider
+-- (MinimalSliderWithSteppersTemplate); if this client doesn't have it,
+-- falls back to the - / + stepper. "format" turns a value into its label.
+function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format)
+    local ok, refresh = pcall(function()
+        local slider = CreateFrame("Frame", nil, parent, "MinimalSliderWithSteppersTemplate")
+        slider:SetPoint("TOPLEFT", 180, y + 6)
+        slider:SetWidth(200)
+        local formatters = {
+            [MinimalSliderWithSteppersMixin.Label.Right] =
+                CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right, format),
+        }
+        slider:Init(getter(), minV, maxV, maxV - minV, formatters)
+        slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+            setter(math.floor(value + 0.5))
+        end, slider)
+
+        local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetPoint("TOPLEFT", 18, y)
+        text:SetText(label)
+        return function() slider:SetValue(getter()) end
+    end)
+    if ok then return refresh end
+    return ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, 1, "")
+end
+
 -- A label with a button that cycles through a list of values.
 function ns.CreateCycle(parent, label, y, values, getter, setter)
     local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -239,7 +286,8 @@ local function InitDB()
     UIVisibilityDB = UIVisibilityDB or {}
     local db = UIVisibilityDB
     if db.language == nil then db.language = "en" end
-    if db.lastTab == nil then db.lastTab = "prd" end
+    if db.lastTab == nil then db.lastTab = "general" end
+    if db.fadeSmoothness == nil then db.fadeSmoothness = 2 end
     db.modules = db.modules or {}
     for _, mod in ipairs(ns.moduleList) do
         db.modules[mod.key] = db.modules[mod.key] or {}
@@ -397,25 +445,70 @@ local function CreateBottomButtons(parent, anchorPoint, x, y)
     helpButton:SetScript("OnClick", ns.ShowHelp)
 end
 
+-- General page: modules with an Open button each, fade smoothness,
+-- language and help. "openModule" decides where Open takes you.
+local function BuildGeneral(parent, y, openModule)
+    local refreshers = {}
+    ns.CreateHeader(parent, L.modules, y)
+    y = y - 24
+    for _, mod in ipairs(ns.moduleList) do
+        refreshers[#refreshers + 1] = ns.CreateCheck(parent, L[mod.titleKey], y,
+            function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end)
+        local open = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        open:SetSize(80, 22)
+        open:SetPoint("TOPLEFT", 260, y - 2)
+        open:SetText(L.open)
+        open:SetScript("OnClick", function() openModule(mod) end)
+        y = y - 28
+    end
+
+    y = y - 16
+    refreshers[#refreshers + 1] = ns.CreateSlider(parent, L.fadeSmooth, y,
+        function() return ns.db.fadeSmoothness end,
+        function(v) ns.db.fadeSmoothness = v end,
+        0, 10,
+        function(v)
+            v = math.floor(v + 0.5)
+            if v == 0 then return L.instant end
+            return tostring(v)
+        end)
+    y = y - 24
+    ns.CreateNote(parent, L.fadeNote, y)
+    y = y - 40
+
+    CreateBottomButtons(parent, "TOPLEFT", 18, y)
+    return function() for _, r in ipairs(refreshers) do r() end end
+end
+
 ---------------------------------------------------------------------------
 -- Floating options window with one tab per module (/uiv)
 ---------------------------------------------------------------------------
 local window
 local tabs, panes, paneRefresh = {}, {}, {}
+local WINDOW_WIDTH = 460
+local TABS_PER_ROW = 4
 
-local function SelectTab(key)
-    if not ns.moduleByKey[key] then key = ns.moduleList[1].key end
+local SelectTab
+
+local function BuildPane(key, pane)
+    if key == "general" then
+        return BuildGeneral(pane, -4, function(mod) SelectTab(mod.key) end)
+    end
+    return ns.moduleByKey[key].BuildOptions(pane, -4)
+end
+
+function SelectTab(key)
+    if key ~= "general" and not ns.moduleByKey[key] then key = "general" end
     ns.db.lastTab = key
     for k, button in pairs(tabs) do
         if k == key then button:LockHighlight() else button:UnlockHighlight() end
     end
     for k, pane in pairs(panes) do pane:SetShown(k == key) end
     if not panes[key] then
-        local mod = ns.moduleByKey[key]
         local pane = CreateFrame("Frame", nil, window)
-        pane:SetPoint("TOPLEFT", 0, -62)
-        pane:SetPoint("BOTTOMRIGHT", 0, 44)
-        paneRefresh[key] = mod.BuildOptions(pane, -4)
+        pane:SetPoint("TOPLEFT", 0, -92)
+        pane:SetPoint("BOTTOMRIGHT", 0, 12)
+        paneRefresh[key] = BuildPane(key, pane)
         pane:SetScript("OnShow", function() paneRefresh[key]() end)
         panes[key] = pane
     end
@@ -424,7 +517,7 @@ end
 
 local function CreateWindow()
     window = CreateFrame("Frame", "UIVisibilityWindow", UIParent, "BasicFrameTemplateWithInset")
-    window:SetSize(380, 600)
+    window:SetSize(WINDOW_WIDTH, 560)
     window:SetPoint("CENTER")
     window:SetFrameStrata("DIALOG")
     window:SetMovable(true)
@@ -443,17 +536,22 @@ local function CreateWindow()
     icon:SetPoint("RIGHT", title, "LEFT", -4, 0)
     icon:SetTexture(ns.ICON)
 
-    local width = (380 - 24 - (#ns.moduleList - 1) * 4) / #ns.moduleList
-    for i, mod in ipairs(ns.moduleList) do
+    -- Tabs: General first, then one per module, in rows of four.
+    local keys = { { key = "general", label = L.tab_general } }
+    for _, mod in ipairs(ns.moduleList) do
+        keys[#keys + 1] = { key = mod.key, label = L[mod.tabKey] }
+    end
+    local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
+    for i, item in ipairs(keys) do
+        local row = math.floor((i - 1) / TABS_PER_ROW)
+        local col = (i - 1) % TABS_PER_ROW
         local button = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
         button:SetSize(width, 24)
-        button:SetPoint("TOPLEFT", 12 + (i - 1) * (width + 4), -30)
-        button:SetText(L[mod.tabKey])
-        button:SetScript("OnClick", function() SelectTab(mod.key) end)
-        tabs[mod.key] = button
+        button:SetPoint("TOPLEFT", 12 + col * (width + 4), -30 - row * 28)
+        button:SetText(item.label)
+        button:SetScript("OnClick", function() SelectTab(item.key) end)
+        tabs[item.key] = button
     end
-
-    CreateBottomButtons(window, "BOTTOMLEFT", 16, 14)
 end
 
 function ns.OpenWindow(key)
@@ -493,20 +591,9 @@ local function RegisterSettings()
     subtitle:SetPoint("TOPLEFT", mainIcon, "BOTTOMLEFT", 0, -6)
     subtitle:SetText(L.subtitle)
 
-    local refreshers = {}
-    local y = -64
-    ns.CreateHeader(main, L.modules, y)
-    y = y - 24
-    for _, mod in ipairs(ns.moduleList) do
-        refreshers[#refreshers + 1] = ns.CreateCheck(main, L[mod.titleKey], y,
-            function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end)
-        y = y - 28
-    end
-    CreateBottomButtons(main, "TOPLEFT", 18, y - 16)
-    main:SetScript("OnShow", function() for _, r in ipairs(refreshers) do r() end end)
-
     ns.settingsCategory = Settings.RegisterCanvasLayoutCategory(main, "UI Visibility")
 
+    -- One sub-page per module.
     if Settings.RegisterCanvasLayoutSubcategory then
         for _, mod in ipairs(ns.moduleList) do
             local page = CreateFrame("Frame")
@@ -515,9 +602,19 @@ local function RegisterSettings()
             pageTitle:SetPoint("TOPLEFT", 16, -16)
             pageTitle:SetText(L[mod.titleKey])
             page:SetScript("OnShow", mod.BuildOptions(page, -48))
-            Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, L[mod.titleKey])
+            mod.settingsCategory = Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, L[mod.titleKey])
         end
     end
+
+    -- "Open" goes to the module's sub-page, or to its tab in the window if
+    -- sub-pages aren't available.
+    main:SetScript("OnShow", BuildGeneral(main, -72, function(mod)
+        if mod.settingsCategory and Settings.OpenToCategory then
+            local ok = pcall(Settings.OpenToCategory, mod.settingsCategory:GetID())
+            if ok then return end
+        end
+        ns.OpenWindow(mod.key)
+    end))
 
     Settings.RegisterAddOnCategory(ns.settingsCategory)
 end
@@ -597,6 +694,10 @@ local TAB_ALIASES = {
     xp = "xp", exp = "xp",
     bars = "bars", barras = "bars",
     minimap = "minimap", minimapa = "minimap",
+    actionbars = "actionbars", ab = "actionbars",
+    unitframes = "unitframes", frames = "unitframes", uf = "unitframes",
+    interface = "interface", interfaz = "interface",
+    general = "general",
 }
 
 local function PrintAllStatus()
@@ -627,6 +728,8 @@ SlashCmdList.UIVISIBILITY = function(msg)
     local cmd, arg = Parse(msg)
     if cmd == "" then
         ns.OpenWindow()
+    elseif TAB_ALIASES[cmd] == "general" then
+        ns.OpenWindow("general")
     elseif TAB_ALIASES[cmd] then
         local sub, subArg = Parse(arg)
         ModuleCommand(ns.moduleByKey[TAB_ALIASES[cmd]], sub, subArg)

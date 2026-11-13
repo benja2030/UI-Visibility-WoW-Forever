@@ -76,6 +76,7 @@ local applying = false
 local lastReason = "-"
 local dirty = true
 local nextCheck = math.huge
+local targetAlpha  -- opacity the display is fading toward
 
 local track = {
     health = { last = 0, untilTime = 0 },
@@ -194,12 +195,7 @@ end
 local function Apply()
     if not prd then return end
     local state = GetState()
-    local alpha = TargetAlpha(state)
-    if math.abs(prd:GetAlpha() - alpha) > 0.001 then
-        applying = true
-        prd:SetAlpha(alpha)
-        applying = false
-    end
+    targetAlpha = TargetAlpha(state) -- the fast tick fades toward it
     ApplyText(state)
 
     -- Next moment something can change without an event: the end of a
@@ -215,7 +211,13 @@ end
 function mod.MarkDirty() dirty = true end
 
 function mod.OnTick(now)
-    if prd and (dirty or now >= nextCheck) then Apply() end
+    if not prd then return end
+    if dirty or now >= nextCheck then Apply() end
+    if targetAlpha then
+        applying = true
+        ns.Fade(prd, targetAlpha)
+        applying = false
+    end
 end
 
 function mod.OnSlowTick()

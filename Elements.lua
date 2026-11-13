@@ -1,21 +1,26 @@
 -- UI Visibility: element engine
--- Shared by the Class Bars and Minimap modules. Each element has three modes:
---   shown:  normal game behavior.
+-- Shared by the modules that control groups of interface elements. Each
+-- element has three modes:
+--   shown:  normal game behavior. The addon brings the element back to normal
+--           once and then leaves it alone, so the game's own fades (like the
+--           chat tabs) keep working.
 --   hidden: invisible, and every part of it that uses the mouse ignores it.
---   hover:  invisible until the cursor is over it.
+--   hover:  invisible until the cursor is over any part of it.
 -- Everything is shown in Edit Mode.
 --
 -- Performance:
 --   * Each element's frames are found once and kept. They are looked up
---     again on the slow tick (every 5 seconds) in case the game recreated
---     them. Expensive searches (addon buttons) only run when asked to.
---   * The fast tick only does work while something can change: an element
---     in On hover mode, a fade in progress, or right after a change.
+--     again on the slow tick (every 5 seconds). Expensive searches (addon
+--     buttons) only run when asked to.
+--   * The fast tick only works while something can change: an element in
+--     On hover mode, an element that can force itself visible, a fade in
+--     progress, or right after a change. If the game changes the opacity of
+--     a controlled element, that counts as a change.
 
 local ADDON_NAME, ns = ...
 local L = ns.Lproxy
 local MODES = { "shown", "hidden", "hover" }
-local LINGER = 0.5 -- seconds a hover group stays visible after the mouse leaves
+local LINGER = 0.5 -- seconds an element stays visible after the mouse leaves
 
 ns.AddLocale("en", {
     linkHover = "Show all On hover elements together",
@@ -36,15 +41,23 @@ ns.AddLocale("es", {
     st_found = "%d encontrados",
 })
 
+-- Helper for finders: adds a frame to a list if it can be used.
+function ns.AddFrame(list, frame)
+    if type(frame) ~= "table" or not frame.GetAlpha then return end
+    if frame.IsForbidden and frame:IsForbidden() then return end
+    list[#list + 1] = frame
+end
+
 -- cfg fields:
 --   key, titleKey, tabKey: module identity and labels.
---   elements: list of { key, label, frame = "path" } or { key, label, find = function }.
---     An element with "multi = true" can have several frames (shown as a count).
---   defaults: module settings (must include enabled, linkHover, modes).
---   minimapHover: offer "show when hovering the minimap".
---   minimapHoverLabel: text for that option.
+--   elements: list of
+--     { key, label, frame = "path" }  or  { key, label, find = function(mod) }
+--     optional: multi = true (shown as a count in status),
+--               expensive = true (find only runs on full refreshes),
+--               forceShow = function() returning true to show it anyway.
+--   defaults: module settings (enabled, linkHover, modes, ...).
+--   minimapHover, minimapHoverLabel: offer "show when hovering the minimap".
 --   noteKey: text shown under the mode buttons.
---   extraOptions(parent, y, mod): optional, adds widgets; returns refresh, newY.
 function ns.NewElementsModule(cfg)
     local mod = {
         key = cfg.key, titleKey = cfg.titleKey, tabKey = cfg.tabKey,
@@ -52,11 +65,15 @@ function ns.NewElementsModule(cfg)
     }
 
     local frameLists = {}   -- element key -> list of frames
-    local managed = {}      -- frames this module controls
+    local managed = {}      -- frame -> element key
+    local released = {}     -- frame -> true when the game has it back
     local mouseState = {}   -- frame -> last mouse state applied
     local disabledParts = {}
+    local hooked = {}
     local dirty = true
-    local lastGroupHover, lastMinimapHover = 0, 0
+    local applying = false
+    local hoverUntil = {}   -- element key -> time it stops counting as hovered
+    local groupUntil, minimapUntil = 0, 0
     local EMPTY = {}
 
     function mod.MarkDirty() dirty = true end
@@ -91,6 +108,20 @@ function ns.NewElementsModule(cfg)
         return InCombatLockdown() and frame.IsProtected and frame:IsProtected()
     end
 
+    -- If the game changes a frame's opacity, check it again on the next tick.
+    local function Hook(frame)
+        if hooked[frame] then return end
+        hooked[frame] = true
+        pcall(hooksecurefunc, frame, "SetAlpha", function()
+            if not applying and not released[frame] then dirty = true end
+        end)
+    end
+
+    local function ElementReleased(elementKey)
+        local db = mod.db
+        return not db.enabled or ns.IsEditMode() or db.modes[elementKey] == "shown"
+    end
+
     -- Rebuilds the frame lists. "full" also runs the expensive finders.
     function mod.RefreshLists(full)
         for _, element in ipairs(cfg.elements) do
@@ -99,68 +130,82 @@ function ns.NewElementsModule(cfg)
                     frameLists[element.key] = element.find(mod)
                 end
             else
-                local frame = ns.Resolve(element.frame)
-                frameLists[element.key] = frame and { frame } or {}
+                local list = {}
+                ns.AddFrame(list, ns.Resolve(element.frame))
+                frameLists[element.key] = list
+            end
+        end
+
+        local current = {}
+        for _, element in ipairs(cfg.elements) do
+            for _, frame in ipairs(GetFrames(element)) do
+                current[frame] = element.key
             end
         end
         -- Frames that left every list get their normal look back.
-        local current = {}
-        for _, list in pairs(frameLists) do
-            for _, frame in ipairs(list) do current[frame] = true end
-        end
         for frame in pairs(managed) do
             if not current[frame] and not IsLocked(frame) then
-                frame:SetAlpha(1)
+                if not released[frame] then frame:SetAlpha(1) end
                 RestoreMouse(frame)
                 mouseState[frame] = nil
+                released[frame] = nil
                 managed[frame] = nil
             end
         end
-        for frame in pairs(current) do managed[frame] = true end
+        -- New frames in Shown mode start released: the addon doesn't touch them.
+        for frame, elementKey in pairs(current) do
+            if not managed[frame] then
+                managed[frame] = elementKey
+                Hook(frame)
+                if ElementReleased(elementKey) then released[frame] = true end
+            end
+        end
         dirty = true
     end
 
-    local function UpdateGroupHover()
+    local function UpdateHover(now)
         local db = mod.db
         if cfg.minimapHover and db.minimapHover and Minimap and ns.IsCursorOver(Minimap) then
-            lastMinimapHover = GetTime()
-            lastGroupHover = GetTime()
-            return
+            minimapUntil = now + LINGER
         end
-        if not db.linkHover then return end
+        local any = false
         for _, element in ipairs(cfg.elements) do
             if db.modes[element.key] == "hover" then
                 for _, frame in ipairs(GetFrames(element)) do
                     if ns.IsCursorOver(frame) then
-                        lastGroupHover = GetTime(); return
+                        hoverUntil[element.key] = now + LINGER
+                        any = true
+                        break
                     end
                 end
             end
         end
+        if any then groupUntil = now + LINGER end
     end
 
-    -- Target opacity and whether the frame should take the mouse.
-    local function Targets(element, frame)
+    -- Returns opacity, mouse, and whether the element goes back to the game.
+    local function Targets(element, now)
         local db = mod.db
-        if not db.enabled or ns.IsEditMode() then return 1, true end
+        if ElementReleased(element.key) then return 1, true, true end
+        if element.forceShow and element.forceShow() then return 1, true, false end
         local mode = db.modes[element.key]
-        if mode == "hidden" then return 0, false end
-        if mode == "hover" then
-            local now = GetTime()
-            if db.linkHover then return (now - lastGroupHover < LINGER) and 1 or 0, true end
-            if cfg.minimapHover and db.minimapHover and now - lastMinimapHover < LINGER then
-                return 1, true
-            end
-            return ns.IsCursorOver(frame) and 1 or 0, true
-        end
-        return 1, true
+        if mode == "hidden" then return 0, false, false end
+        -- hover
+        if now < (hoverUntil[element.key] or 0) then return 1, true, false end
+        if db.linkHover and now < groupUntil then return 1, true, false end
+        if cfg.minimapHover and db.minimapHover and now < minimapUntil then return 1, true, false end
+        return 0, true, false
     end
-    mod.Targets = Targets
 
     -- Applies the targets to one frame. Returns true if work remains.
-    local function UpdateFrame(element, frame)
-        local alpha, mouse = Targets(element, frame)
+    local function UpdateFrame(frame, alpha, mouse, release)
+        if release and released[frame] then return false end
+        if not release then released[frame] = nil end
+
+        applying = true
         local busy = ns.Fade(frame, alpha)
+        applying = false
+
         local last = mouseState[frame]
         if last == nil then last = true end
         if last ~= mouse then
@@ -171,28 +216,34 @@ function ns.NewElementsModule(cfg)
                 mouseState[frame] = mouse
             end
         end
+
+        if release and not busy then released[frame] = true end
         return busy
     end
 
-    local function AnyHover()
+    -- True while the module has to check things on every tick.
+    local function NeedsPolling()
         local db = mod.db
         if not db.enabled then return false end
         if cfg.minimapHover and db.minimapHover then return true end
         for _, element in ipairs(cfg.elements) do
-            if db.modes[element.key] == "hover" then return true end
+            local mode = db.modes[element.key]
+            if mode == "hover" then return true end
+            if element.forceShow and mode ~= "shown" then return true end
         end
         return false
     end
 
-    function mod.OnTick()
+    function mod.OnTick(now)
         if not mod.db then return end
-        local hover = AnyHover()
-        if not dirty and not hover then return end
-        if hover then UpdateGroupHover() end
+        local poll = NeedsPolling()
+        if not dirty and not poll then return end
+        if poll then UpdateHover(now) end
         local busy = false
         for _, element in ipairs(cfg.elements) do
+            local alpha, mouse, release = Targets(element, now)
             for _, frame in ipairs(GetFrames(element)) do
-                if UpdateFrame(element, frame) then busy = true end
+                if UpdateFrame(frame, alpha, mouse, release) then busy = true end
             end
         end
         dirty = busy
@@ -206,8 +257,6 @@ function ns.NewElementsModule(cfg)
         mod.RefreshLists(true)
     end
 
-    -- When disabled, Targets returns "shown" for everything, so the next
-    -- ticks restore the normal look and then go idle.
     function mod.SetEnabled(v)
         mod.db.enabled = v
         dirty = true
@@ -244,6 +293,7 @@ function ns.NewElementsModule(cfg)
     end
 
     function mod.PrintStatus()
+        local now = GetTime()
         for _, element in ipairs(cfg.elements) do
             local frames = GetFrames(element)
             local frame = frames[1]
@@ -262,7 +312,7 @@ function ns.NewElementsModule(cfg)
                 if mod.db.modes[element.key] == "hover" then
                     detail = detail .. ", " .. (ns.IsCursorOver(frame) and L.st_hoverOn or L.st_hoverOff)
                 end
-                local _, mouse = Targets(element, frame)
+                local _, mouse = Targets(element, now)
                 local last = mouseState[frame]
                 if last == nil then last = true end
                 if mouse ~= last then detail = detail .. L.st_pending end
