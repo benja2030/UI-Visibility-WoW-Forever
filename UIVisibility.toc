@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: UI Visibility
+## Notes: Controls when parts of the interface are visible: Personal Resource Display, experience bar, class bars and minimap elements.
+## Version: 1.0
+## SavedVariables: UIVisibilityDB
+Core.lua
+Elements.lua
+PRD.lua
+XPBar.lua
+ClassBars.lua
+Minimap.lua
