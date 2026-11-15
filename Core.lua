@@ -610,7 +610,7 @@ local function CreateWindow()
     end
     local rows = math.ceil(#keys / TABS_PER_ROW)
     paneTop = -36 - rows * 28
-    window:SetHeight(590 + rows * 28)
+    window:SetHeight(620 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)

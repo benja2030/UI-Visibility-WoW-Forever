@@ -36,13 +36,14 @@ ns.AddLocale("en", {
     nm_npcs = "NPCs",
     nm_enemies = "Enemies",
     nm_worldOnly = "Only when hovering characters in the world",
-    nm_delay = "Show delay",
+    nm_delay = "Name delay",
+    nm_tooltipDelay = "Tooltip delay",
     nm_hideCombat = "Don't show it in combat",
     nm_hideInstances = "Don't show it in dungeons, raids and battlegrounds",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Show the tooltip next to the cursor",
     nm_tooltipScale = "Tooltip size",
-    nm_note = "The show delay applies to both the name and the tooltip of characters and objects in the world. The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor.",
+    nm_note = "The tooltip delay only applies to characters and objects in the world, not to buttons or windows. The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor.",
     nm_st_disabled = "module disabled",
     nm_st_showing = "showing %s at the cursor",
     nm_st_idle = "waiting for the mouse",
@@ -60,13 +61,14 @@ ns.AddLocale("es", {
     nm_npcs = "PNJ",
     nm_enemies = "Enemigos",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
-    nm_delay = "Retraso",
+    nm_delay = "Retraso del nombre",
+    nm_tooltipDelay = "Retraso del tooltip",
     nm_hideCombat = "No mostrarlo en combate",
     nm_hideInstances = "No mostrarlo en mazmorras, bandas y campos de batalla",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Mostrar el tooltip junto al cursor",
     nm_tooltipScale = "Tamaño del tooltip",
-    nm_note = "El retraso se aplica al nombre y al tooltip de personajes y objetos del mundo. El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor.",
+    nm_note = "El retraso del tooltip solo se aplica a personajes y objetos del mundo, no a botones ni ventanas. El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor.",
     nm_st_disabled = "módulo desactivado",
     nm_st_showing = "mostrando a %s junto al cursor",
     nm_st_idle = "esperando el mouse",
@@ -89,6 +91,7 @@ local mod = {
         hideInstances = false,
         tooltipCursor = false,
         tooltipScale = 100,
+        tooltipDelay = 0,   -- tenths of a second before world tooltips show
     },
 }
 ns.RegisterModule(mod)
@@ -254,17 +257,17 @@ end
 -- the tooltip is moved next to the cursor and scaled.
 --
 -- Delay: when the tooltip opens while the mouse is over the world (a
--- character, NPC or object), it stays invisible for the same delay as the
--- name. Tooltips of buttons and windows are never delayed. The tooltip is
+-- character, NPC or object), it stays invisible for the tooltip delay
+-- (separate from the name delay). Tooltips of buttons and windows are never delayed. The tooltip is
 -- kept invisible every frame, because the game sets its opacity itself.
 local tooltipHooked = false
 local tooltipPendingUntil -- time the delayed tooltip becomes visible
 
 local function DelayTooltip(tooltip)
     local db = mod.db
-    if not (db and db.enabled) or db.delay <= 0 then return end
+    if not (db and db.enabled) or db.tooltipDelay <= 0 then return end
     if not MouseOverWorld() then return end
-    tooltipPendingUntil = GetTime() + db.delay / 10
+    tooltipPendingUntil = GetTime() + db.tooltipDelay / 10
     tooltip:SetAlpha(0)
 end
 
@@ -384,6 +387,10 @@ function mod.BuildOptions(parent, y)
     add(ns.CreateSlider(parent, L.nm_tooltipScale, y,
         function() return mod.db.tooltipScale end, set("tooltipScale"), 50, 200,
         function(v) return math.floor(v + 0.5) .. "%" end))
+    y = y - 32
+    add(ns.CreateStepper(parent, L.nm_tooltipDelay, y,
+        function() return mod.db.tooltipDelay end, set("tooltipDelay"), 0, 10, 1,
+        function(v) return string.format("%.1f s", v / 10) end))
     y = y - 40
     ns.CreateNote(parent, L.nm_note, y)
 
