@@ -930,12 +930,14 @@ end
 
 -- True while you're using the interface: this addon's options, the game's
 -- options or menu, or typing in chat. Time spent there never counts.
+-- Uses IsVisible, so windows that are open but hidden with the interface
+-- (like the chat box after pressing Enter) don't count.
 local function UsingInterface()
-    if UIVisibilityWindow and UIVisibilityWindow:IsShown() then return true end
-    if SettingsPanel and SettingsPanel:IsShown() then return true end
-    if GameMenuFrame and GameMenuFrame:IsShown() then return true end
+    if UIVisibilityWindow and UIVisibilityWindow:IsVisible() then return true end
+    if SettingsPanel and SettingsPanel:IsVisible() then return true end
+    if GameMenuFrame and GameMenuFrame:IsVisible() then return true end
     local editBox = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
-    return editBox ~= nil and editBox:IsShown()
+    return editBox ~= nil and editBox:IsVisible()
 end
 
 -- True if the mouse moved since the last check.
@@ -954,16 +956,22 @@ local function UpdateIdle(now)
         AutoShow("idle")
         return
     end
-    if InCombatLockdown() or UsingInterface() then
+    if InCombatLockdown() then
+        lastActive = now
+        return
+    end
+    -- Moving the character always comes first, so it shows everything again
+    -- even while the chat box or a window is open.
+    if db.autoStill and GetUnitSpeed("player") > 0 then
+        lastActive = now
+        AutoShow("idle")
+        return
+    end
+    if UsingInterface() then
         lastActive = now
         return
     end
     if db.autoStill then
-        if GetUnitSpeed("player") > 0 then
-            lastActive = now
-            AutoShow("idle")
-            return
-        end
         if cursorMoved then
             -- The mouse always stops the count; it only undoes the hide if
             -- the player chose that.
@@ -979,29 +987,70 @@ end
 -- with the menu (the menu is part of the interface, so it can't show alone).
 -- When the menu, and any window opened from it, is closed again, the
 -- interface goes back to hidden.
+-- True if any menu or window is open. Besides the known ones, it checks the
+-- game's lists of panels and of windows that close with Esc, so it finds the
+-- system menu whatever it's called in this version of the game.
+local PANEL_AREAS = { "left", "center", "right", "doublewide", "fullscreen" }
+
 local function MenusOpen()
-    if GameMenuFrame and GameMenuFrame:IsShown() then return true end
-    if SettingsPanel and SettingsPanel:IsShown() then return true end
-    if AddonList and AddonList:IsShown() then return true end
-    if UIVisibilityWindow and UIVisibilityWindow:IsShown() then return true end
-    if HelpFrame and HelpFrame:IsShown() then return true end
-    if MacroFrame and MacroFrame:IsShown() then return true end
+    for _, name in ipairs({ "GameMenuFrame", "SettingsPanel", "AddonList",
+        "UIVisibilityWindow", "HelpFrame", "MacroFrame" }) do
+        local frame = _G[name]
+        if frame and frame.IsShown and frame:IsShown() then return true end
+    end
+    if GetUIPanel then
+        for _, area in ipairs(PANEL_AREAS) do
+            local ok, panel = pcall(GetUIPanel, area)
+            if ok and panel then return true end
+        end
+    end
+    if UISpecialFrames then
+        for _, name in ipairs(UISpecialFrames) do
+            local frame = _G[name]
+            if frame and frame.IsShown and frame:IsShown() then return true end
+        end
+    end
     return ns.IsEditMode()
 end
 
+-- Esc while hidden: wait for the menu to appear, then for it (and anything
+-- opened from it) to close, and hide the interface again. If no menu shows
+-- up at all, Esc just brought the interface back, so the names come back
+-- too and nothing is left half hidden.
+local escStarted = 0
+local menuSeen = false
+local MENU_WAIT = 0.5
+
 if ToggleGameMenu then
     hooksecurefunc("ToggleGameMenu", function()
-        if uiHiddenByAddon and UIParent:IsShown() then escPending = true end
+        if uiHiddenByAddon and UIParent:IsShown() and not escPending then
+            escPending, menuSeen, escStarted = true, false, GetTime()
+        end
     end)
 end
 
-local function UpdateEscape()
+local function UpdateEscape(now)
     if not escPending then return end
     if not uiHiddenByAddon or not mod.db.worldNamesSaved then
         escPending = false
         return
     end
-    if InCombatLockdown() or MenusOpen() then return end
+    if MenusOpen() then
+        menuSeen = true
+        return
+    end
+    if not menuSeen then
+        if now - escStarted < MENU_WAIT then return end
+        -- No menu: treat Esc as "show everything".
+        escPending = false
+        if not UIParent:IsShown() then return end
+        uiHiddenByAddon = false
+        ToggleAll()
+        mod.db.autoReason = nil
+        lastActive = now
+        return
+    end
+    if InCombatLockdown() then return end
     escPending = false
     if UIParent:IsShown() then UIParent:Hide() end
 end
@@ -1009,7 +1058,7 @@ end
 function UpdateAutoRules(now)
     if mod.db then
         UpdateIdle(now)
-        UpdateEscape()
+        UpdateEscape(now)
     end
 end
 
