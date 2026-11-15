@@ -36,7 +36,7 @@ ns.AddLocale("en", {
     nm_npcs = "NPCs",
     nm_enemies = "Enemies",
     nm_worldOnly = "Only when hovering characters in the world",
-    nm_delay = "Delay before showing",
+    nm_delay = "Delay before showing (name and tooltip)",
     nm_hideCombat = "Don't show it in combat",
     nm_hideInstances = "Don't show it in dungeons, raids and battlegrounds",
     nm_tooltipHeader = "Tooltip:",
@@ -60,7 +60,7 @@ ns.AddLocale("es", {
     nm_npcs = "PNJ",
     nm_enemies = "Enemigos",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
-    nm_delay = "Espera antes de mostrarlo",
+    nm_delay = "Espera antes de mostrar (nombre y tooltip)",
     nm_hideCombat = "No mostrarlo en combate",
     nm_hideInstances = "No mostrarlo en mazmorras, bandas y campos de batalla",
     nm_tooltipHeader = "Tooltip:",
@@ -211,8 +211,10 @@ local function SetFromMouseover()
 end
 
 local lastGUID
+local UpdateTooltipDelay -- defined in the tooltip section
 
 function mod.OnTick(now)
+    UpdateTooltipDelay(now)
     local db = mod.db
     local want = db.enabled and db.cursorName and WantsHovered()
     if want then
@@ -250,7 +252,35 @@ end
 -- The game calls GameTooltip_SetDefaultAnchor for tooltips that would go to
 -- the corner (world objects, characters and many buttons). Right after it,
 -- the tooltip is moved next to the cursor and scaled.
+--
+-- Delay: tooltips for things in the world (anchored to UIParent or the
+-- world) start invisible and appear after the same delay as the name.
+-- Tooltips of buttons and windows are never delayed.
 local tooltipHooked = false
+local tooltipPendingUntil -- time the delayed tooltip becomes visible
+
+local function DelayTooltip(tooltip, parent)
+    local db = mod.db
+    if db.delay <= 0 then return end
+    if parent ~= UIParent and parent ~= WorldFrame then return end
+    tooltipPendingUntil = GetTime() + db.delay / 10
+    tooltip:SetAlpha(0)
+end
+
+-- Called every tick: keeps a delayed tooltip hidden until its time comes.
+function UpdateTooltipDelay(now)
+    if not tooltipPendingUntil then return end
+    if not GameTooltip:IsShown() then
+        tooltipPendingUntil = nil
+        return
+    end
+    if now >= tooltipPendingUntil then
+        tooltipPendingUntil = nil
+        GameTooltip:SetAlpha(1)
+    elseif GameTooltip:GetAlpha() > 0 then
+        GameTooltip:SetAlpha(0) -- the game showed it again
+    end
+end
 
 local function HookTooltip()
     if tooltipHooked or not GameTooltip_SetDefaultAnchor then return end
@@ -265,10 +295,15 @@ local function HookTooltip()
         if db.tooltipScale ~= 100 then
             tooltip:SetScale(db.tooltipScale / 100)
         end
+        DelayTooltip(tooltip, parent)
     end)
     -- Other tooltips (items, spells) keep their normal size.
     GameTooltip:HookScript("OnHide", function(self)
         if self:GetScale() ~= 1 then self:SetScale(1) end
+        if tooltipPendingUntil then
+            tooltipPendingUntil = nil
+            self:SetAlpha(1)
+        end
     end)
 end
 
