@@ -122,7 +122,9 @@ ns.AddLocale("en", {
     nm_autoIdle_tip = "Hides after you've been out of combat for the time below, and shows again when combat starts.",
     nm_autoIdleTime = "Time",
     nm_autoStill = "Only while standing still",
-    nm_autoStill_tip = "The time only counts while you don't move, and moving shows everything again. Off: names hide even while you walk around.",
+    nm_autoStill_tip = "The time only counts while you don't move your character or the mouse. Moving your character shows everything again. Off: names hide even while you walk around.",
+    nm_autoMouse = "Moving the mouse shows it again",
+    nm_autoMouse_tip = "On: once hidden, moving the mouse brings everything back, like a screensaver. Off: the mouse only stops the count before hiding, and everything stays hidden until you move your character, a fight starts or you use the button.",
     nm_combatBlocked = "the interface can't be hidden or shown during combat. Try again after the fight, or press Alt+Z.",
     style_eye = "Simple eye",
     style_spell = "Game icon",
@@ -238,7 +240,9 @@ ns.AddLocale("es", {
     nm_autoIdle_tip = "Oculta después de estar fuera de combate el tiempo de abajo, y muestra otra vez cuando empieza un combate.",
     nm_autoIdleTime = "Tiempo",
     nm_autoStill = "Solo si estás quieto",
-    nm_autoStill_tip = "El tiempo solo cuenta mientras no te mueves, y moverte vuelve a mostrar todo. Desactivado: los nombres se ocultan aunque estés caminando.",
+    nm_autoStill_tip = "El tiempo solo cuenta mientras no mueves a tu personaje ni el mouse. Mover a tu personaje vuelve a mostrar todo. Desactivado: los nombres se ocultan aunque estés caminando.",
+    nm_autoMouse = "Mover el mouse lo vuelve a mostrar",
+    nm_autoMouse_tip = "Activado: una vez oculto, mover el mouse vuelve a mostrar todo, como un protector de pantalla. Desactivado: el mouse solo detiene el contador antes de ocultar, y todo sigue oculto hasta que mueves a tu personaje, empieza un combate o usas el botón.",
     nm_combatBlocked = "la interfaz no se puede ocultar ni mostrar en combate. Inténtalo después de la pelea, o presiona Alt+Z.",
     style_eye = "Ojo simple",
     style_spell = "Ícono del juego",
@@ -294,6 +298,7 @@ local mod = {
         autoIdle = false,
         autoIdleTime = 30,  -- seconds out of combat before hiding
         autoStill = true,   -- the time only counts while standing still
+        autoMouseShows = false, -- moving the mouse undoes an "idle" hide
         autoReason = nil,   -- "afk" or "idle" while hidden automatically
         buttonIdleAlpha = 30,   -- % while not hovered, in "hover" mode
         buttonSize = 32,
@@ -791,12 +796,18 @@ end
 -- Returns true if names are shown again, false if hidden, and nil if the
 -- interface part had to wait because of combat (then nothing changes).
 local ToggleAll
+local lastActive = GetTime() -- last moment the player did something
 
 -- What the player does by hand (buttons and command). It also forgets any
--- automatic reason, so automatic rules never undo a manual choice.
+-- automatic reason, so automatic rules never undo a manual choice, and
+-- restarts the "time out of combat" count, so showing everything by hand
+-- isn't followed by an instant hide.
 local function ManualToggle()
     local result = ToggleAll()
-    if result ~= nil then mod.db.autoReason = nil end
+    if result ~= nil then
+        mod.db.autoReason = nil
+        lastActive = GetTime()
+    end
     return result
 end
 
@@ -899,7 +910,7 @@ local function AutoShow(reason)
     if ToggleAll() == true then db.autoReason = nil end
 end
 
-local lastActive = GetTime() -- last combat end or movement
+local lastCursorX, lastCursorY = 0, 0
 
 local function UpdateAfk()
     local db = mod.db
@@ -913,21 +924,49 @@ local function UpdateAfk()
     end
 end
 
+-- True while you're using the interface: this addon's options, the game's
+-- options or menu, or typing in chat. Time spent there never counts.
+local function UsingInterface()
+    if UIVisibilityWindow and UIVisibilityWindow:IsShown() then return true end
+    if SettingsPanel and SettingsPanel:IsShown() then return true end
+    if GameMenuFrame and GameMenuFrame:IsShown() then return true end
+    local editBox = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+    return editBox ~= nil and editBox:IsShown()
+end
+
+-- True if the mouse moved since the last check.
+local function CursorMoved()
+    local x, y = GetCursorPosition()
+    local moved = math.abs(x - lastCursorX) > 2 or math.abs(y - lastCursorY) > 2
+    lastCursorX, lastCursorY = x, y
+    return moved
+end
+
 -- Called every tick: the "time out of combat" rule.
 local function UpdateIdle(now)
     local db = mod.db
+    local cursorMoved = CursorMoved()
     if not (db.enabled and db.autoIdle) then
         AutoShow("idle")
         return
     end
-    if InCombatLockdown() then
+    if InCombatLockdown() or UsingInterface() then
         lastActive = now
         return
     end
-    if db.autoStill and GetUnitSpeed("player") > 0 then
-        lastActive = now
-        AutoShow("idle")
-        return
+    if db.autoStill then
+        if GetUnitSpeed("player") > 0 then
+            lastActive = now
+            AutoShow("idle")
+            return
+        end
+        if cursorMoved then
+            -- The mouse always stops the count; it only undoes the hide if
+            -- the player chose that.
+            lastActive = now
+            if db.autoMouseShows then AutoShow("idle") end
+            return
+        end
     end
     if now - lastActive >= db.autoIdleTime then AutoHide("idle") end
 end
@@ -1143,6 +1182,11 @@ function mod.BuildOptions(parent, y)
     add(ns.CreateCheck(parent, L.nm_autoStill, y,
         function() return db().autoStill end, set("autoStill"),
         { x = 40, tooltip = L.nm_autoStill_tip, enabledIf = function() return db().autoIdle end }))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_autoMouse, y,
+        function() return db().autoMouseShows end, set("autoMouseShows"),
+        { x = 64, tooltip = L.nm_autoMouse_tip,
+          enabledIf = function() return db().autoIdle and db().autoStill end }))
     y = y - 40
 
     ns.CreateSection(parent, L.nm_secButton, y)
