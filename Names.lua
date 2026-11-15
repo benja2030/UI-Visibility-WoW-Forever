@@ -6,7 +6,8 @@
 -- character, the cursor is on top of it, and addons do know where the cursor
 -- is. So this module offers two things:
 --   * Name at the cursor: a big copy of the hovered character's name, in the
---     game's name colors, follows the cursor while you hover them. A quest
+--     game's name colors, follows the cursor while you hover them. Their
+--     level can show after the name, colored by difficulty. A quest
 --     mark can show next to it when the character is part of one of your
 --     active quests.
 --   * Tooltip at the cursor: the tooltip shows up next to the cursor instead
@@ -34,6 +35,8 @@ ns.AddLocale("en", {
     above = "Above the cursor", right = "Right of the cursor", below = "Below the cursor",
     nm_skipPlates = "Skip characters close enough to have a nameplate",
     nm_questMark = "Show a quest mark if the character is part of your quests",
+    nm_showLevel = "Show the character's level",
+    nm_levelColor = "    Color the level by difficulty",
     nm_skipDead = "Don't show it for dead characters",
     nm_who = "Show it when hovering:",
     nm_alliedPlayers = "Allied players",
@@ -62,6 +65,8 @@ ns.AddLocale("es", {
     above = "Sobre el cursor", right = "A la derecha", below = "Bajo el cursor",
     nm_skipPlates = "Omitir personajes cercanos que ya tienen placa",
     nm_questMark = "Mostrar una marca si el personaje es parte de tus misiones",
+    nm_showLevel = "Mostrar el nivel del personaje",
+    nm_levelColor = "    Colorear el nivel por dificultad",
     nm_skipDead = "No mostrarlo para personajes muertos",
     nm_who = "Mostrarlo al apuntar a:",
     nm_alliedPlayers = "Jugadores aliados",
@@ -91,6 +96,8 @@ local mod = {
         position = "above",
         skipPlates = false,
         questMark = true,
+        showLevel = true,
+        levelColor = true,  -- false: the level uses the name's color
         skipDead = true,
         alliedPlayers = true,
         enemyPlayers = true,
@@ -257,13 +264,40 @@ local hoverStart -- when the mouse started hovering a character
 local hoveredName = ""
 
 -- Name and color the game uses for the hovered character.
+-- Level text like the game shows it: "(32)", "(32+)" for elites and "(??)"
+-- when it's too high to see. Colored by how hard it is for you, or left in
+-- the name's color if that option is off.
+local function LevelText()
+    local level = UnitLevel("mouseover")
+    if ns.IsSecret(level) or not level then return nil end
+    local label = level > 0 and tostring(level) or "??"
+    local classification = UnitClassification("mouseover")
+    if not ns.IsSecret(classification)
+        and (classification == "elite" or classification == "rareelite" or classification == "worldboss") then
+        label = label .. "+"
+    end
+    if not mod.db.levelColor then return "(" .. label .. ")" end
+    local r, g, b = 1, 0.1, 0.1 -- "??": much higher than you
+    if level > 0 then
+        local getColor = GetCreatureDifficultyColor or GetQuestDifficultyColor
+        local ok, color = pcall(getColor, level)
+        if ok and color then r, g, b = color.r, color.g, color.b end
+    end
+    return string.format("|cff%02x%02x%02x(%s)|r", r * 255, g * 255, b * 255, label)
+end
+
 local function SetFromMouseover()
     local name = UnitName("mouseover")
     if ns.IsSecret(name) then
         pcall(text.SetText, text, name) -- can't be read, but can be shown
         hoveredName = "?"
     else
-        text:SetText(name or "")
+        local shown = name or ""
+        if mod.db.showLevel then
+            local level = LevelText()
+            if level then shown = shown .. " " .. level end
+        end
+        text:SetText(shown)
         hoveredName = name or "?"
     end
     local ok, r, g, b = pcall(UnitSelectionColor, "mouseover")
@@ -444,6 +478,12 @@ function mod.BuildOptions(parent, y)
     y = y - 28
     add(ns.CreateCheck(parent, L.nm_questMark, y,
         function() return mod.db.questMark end, set("questMark")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_showLevel, y,
+        function() return mod.db.showLevel end, set("showLevel")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_levelColor, y,
+        function() return mod.db.levelColor end, set("levelColor")))
     y = y - 34
 
     ns.CreateHeader(parent, L.nm_who, y)
