@@ -105,7 +105,8 @@ ns.AddLocale("en", {
     nm_toggledOff = "names above heads hidden. Use /uiv togglenames to bring them back.",
     nm_toggledOn = "names above heads shown again.",
     nm_secQuick = "Quick toggle",
-    nm_showButton = "Button on screen",
+    nm_showButton = "Show the button",
+    nm_secButton = "Button on screen",
     nm_showButton_tip = "Shows a small button that hides or shows all names above heads with one click.",
     nm_buttonMode = "Button mode",
     nm_buttonStyle = "Button icon",
@@ -113,6 +114,15 @@ ns.AddLocale("en", {
     nm_quickTarget_tip = "Names and interface also hides the whole interface, like Alt+Z. The button on screen stays visible so you can bring everything back. It can't hide or show the interface during combat.",
     target_names = "Names only",
     target_all = "Names and interface",
+    nm_secAuto = "Hide automatically",
+    nm_autoNote = "Hides the same things as the quick toggle, and brings them back on their own when the reason ends. It never undoes something you hid yourself.",
+    nm_autoAfk = "While you're away",
+    nm_autoAfk_tip = "Hides when you go <Away>, and shows again when you come back.",
+    nm_autoIdle = "After time out of combat",
+    nm_autoIdle_tip = "Hides after you've been out of combat for the time below, and shows again when combat starts.",
+    nm_autoIdleTime = "Time",
+    nm_autoStill = "Only while standing still",
+    nm_autoStill_tip = "The time only counts while you don't move, and moving shows everything again. Off: names hide even while you walk around.",
     nm_combatBlocked = "the interface can't be hidden or shown during combat. Try again after the fight, or press Alt+Z.",
     style_eye = "Simple eye",
     style_spell = "Game icon",
@@ -211,7 +221,8 @@ ns.AddLocale("es", {
     nm_toggledOff = "nombres sobre la cabeza ocultos. Usa /uiv togglenames para volver a mostrarlos.",
     nm_toggledOn = "nombres sobre la cabeza visibles otra vez.",
     nm_secQuick = "Alternar rápido",
-    nm_showButton = "Botón en pantalla",
+    nm_showButton = "Mostrar el botón",
+    nm_secButton = "Botón en pantalla",
     nm_showButton_tip = "Muestra un botón pequeño que oculta o muestra todos los nombres sobre la cabeza con un clic.",
     nm_buttonMode = "Modo del botón",
     nm_buttonStyle = "Ícono del botón",
@@ -219,6 +230,15 @@ ns.AddLocale("es", {
     nm_quickTarget_tip = "Nombres e interfaz también oculta toda la interfaz, como Alt+Z. El botón en pantalla sigue visible para que puedas volver a mostrar todo. No puede ocultar ni mostrar la interfaz durante el combate.",
     target_names = "Solo nombres",
     target_all = "Nombres e interfaz",
+    nm_secAuto = "Ocultar automáticamente",
+    nm_autoNote = "Oculta lo mismo que el alternar rápido, y lo vuelve a mostrar solo cuando la razón termina. Nunca deshace algo que ocultaste tú.",
+    nm_autoAfk = "Mientras estás ausente",
+    nm_autoAfk_tip = "Oculta cuando quedas <Ausente>, y muestra otra vez cuando vuelves.",
+    nm_autoIdle = "Tras un tiempo fuera de combate",
+    nm_autoIdle_tip = "Oculta después de estar fuera de combate el tiempo de abajo, y muestra otra vez cuando empieza un combate.",
+    nm_autoIdleTime = "Tiempo",
+    nm_autoStill = "Solo si estás quieto",
+    nm_autoStill_tip = "El tiempo solo cuenta mientras no te mueves, y moverte vuelve a mostrar todo. Desactivado: los nombres se ocultan aunque estés caminando.",
     nm_combatBlocked = "la interfaz no se puede ocultar ni mostrar en combate. Inténtalo después de la pelea, o presiona Alt+Z.",
     style_eye = "Ojo simple",
     style_spell = "Ícono del juego",
@@ -270,6 +290,11 @@ local mod = {
         buttonMode = "shown",   -- "shown" or "hover"
         buttonStyle = "style_eye", -- "style_eye" (drawn eye) or "style_spell" (game icon)
         quickTarget = "target_names", -- "target_names" or "target_all" (names and interface)
+        autoAfk = false,
+        autoIdle = false,
+        autoIdleTime = 30,  -- seconds out of combat before hiding
+        autoStill = true,   -- the time only counts while standing still
+        autoReason = nil,   -- "afk" or "idle" while hidden automatically
         buttonIdleAlpha = 30,   -- % while not hovered, in "hover" mode
         buttonSize = 32,
         buttonPoint = nil,      -- saved position   -- tenths of a second before world tooltips show
@@ -480,10 +505,12 @@ end
 local lastGUID
 local UpdateTooltipDelay -- defined in the tooltip section
 local UpdateToggleButton -- defined in the quick toggle section
+local UpdateAutoRules    -- defined in the "hide automatically" section
 
 function mod.OnTick(now)
     UpdateTooltipDelay(now)
     UpdateToggleButton(now)
+    UpdateAutoRules(now)
     local db = mod.db
     local want = db.enabled and db.cursorName and WantsHovered()
     if want then
@@ -763,7 +790,17 @@ end
 -- Toggles the names and updates everything that shows their state.
 -- Returns true if names are shown again, false if hidden, and nil if the
 -- interface part had to wait because of combat (then nothing changes).
-local function ToggleAll()
+local ToggleAll
+
+-- What the player does by hand (buttons and command). It also forgets any
+-- automatic reason, so automatic rules never undo a manual choice.
+local function ManualToggle()
+    local result = ToggleAll()
+    if result ~= nil then mod.db.autoReason = nil end
+    return result
+end
+
+function ToggleAll()
     local db = mod.db
     local hiding = db.worldNamesSaved == nil
     local uiHidden = not UIParent:IsShown()
@@ -811,7 +848,7 @@ end)
 
 toggle:SetScript("OnClick", function()
     if IsShiftKeyDown() then return end -- Shift is for moving
-    ToggleAll()
+    ManualToggle()
 end)
 toggle:SetScript("OnDragStart", function(self)
     if IsShiftKeyDown() then self:StartMoving() end
@@ -844,6 +881,82 @@ function UpdateToggleButton(now)
     end
     ns.Fade(toggle, target)
 end
+
+---------------------------------------------------------------------------
+-- Hide automatically
+---------------------------------------------------------------------------
+-- Hides for a reason ("afk" or "idle") if everything is shown, and shows
+-- again only if it was hidden for that same reason.
+local function AutoHide(reason)
+    local db = mod.db
+    if db.worldNamesSaved then return end
+    if ToggleAll() == false then db.autoReason = reason end
+end
+
+local function AutoShow(reason)
+    local db = mod.db
+    if not db.worldNamesSaved or db.autoReason ~= reason then return end
+    if ToggleAll() == true then db.autoReason = nil end
+end
+
+local lastActive = GetTime() -- last combat end or movement
+
+local function UpdateAfk()
+    local db = mod.db
+    if not db then return end
+    local away = UnitIsAFK("player")
+    if ns.IsSecret(away) then return end
+    if db.enabled and db.autoAfk and away then
+        AutoHide("afk")
+    else
+        AutoShow("afk")
+    end
+end
+
+-- Called every tick: the "time out of combat" rule.
+local function UpdateIdle(now)
+    local db = mod.db
+    if not (db.enabled and db.autoIdle) then
+        AutoShow("idle")
+        return
+    end
+    if InCombatLockdown() then
+        lastActive = now
+        return
+    end
+    if db.autoStill and GetUnitSpeed("player") > 0 then
+        lastActive = now
+        AutoShow("idle")
+        return
+    end
+    if now - lastActive >= db.autoIdleTime then AutoHide("idle") end
+end
+
+function UpdateAutoRules(now)
+    if mod.db then UpdateIdle(now) end
+end
+
+local autoEvents = CreateFrame("Frame")
+autoEvents:RegisterEvent("PLAYER_FLAGS_CHANGED")
+autoEvents:RegisterEvent("PLAYER_ENTERING_WORLD")
+autoEvents:RegisterEvent("PLAYER_REGEN_DISABLED")
+autoEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+autoEvents:SetScript("OnEvent", function(self, event, unit)
+    if not mod.db then return end
+    if event == "PLAYER_REGEN_DISABLED" then
+        -- Runs just before combat locks the interface, so it can still be
+        -- shown here.
+        lastActive = GetTime()
+        AutoShow("idle")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        lastActive = GetTime()
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        lastActive = GetTime()
+        UpdateAfk()
+    elseif unit == "player" then
+        UpdateAfk()
+    end
+end)
 
 ---------------------------------------------------------------------------
 -- Module hooks
@@ -994,7 +1107,7 @@ function mod.BuildOptions(parent, y)
     local toggleButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     toggleButton:SetSize(220, 24)
     toggleButton:SetPoint("TOPLEFT", 20, y)
-    toggleButton:SetScript("OnClick", function() ToggleAll() end)
+    toggleButton:SetScript("OnClick", function() ManualToggle() end)
     y = y - 30
     local stateNote = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     stateNote:SetPoint("TOPLEFT", 18, y)
@@ -1011,6 +1124,29 @@ function mod.BuildOptions(parent, y)
     end)
     y = y - 34
 
+    -- Hide automatically
+    ns.CreateSection(parent, L.nm_secAuto, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.nm_autoNote, y) - 12
+    add(ns.CreateCheck(parent, L.nm_autoAfk, y,
+        function() return db().autoAfk end,
+        function(v) db().autoAfk = v; UpdateAfk(); refreshAll() end,
+        { tooltip = L.nm_autoAfk_tip }))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_autoIdle, y,
+        function() return db().autoIdle end, set("autoIdle"),
+        { tooltip = L.nm_autoIdle_tip }))
+    y = y - 32
+    add(ns.CreateStepper(parent, L.nm_autoIdleTime, y,
+        function() return db().autoIdleTime end, set("autoIdleTime"), 10, 300, 10, " s"))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_autoStill, y,
+        function() return db().autoStill end, set("autoStill"),
+        { x = 40, tooltip = L.nm_autoStill_tip, enabledIf = function() return db().autoIdle end }))
+    y = y - 40
+
+    ns.CreateSection(parent, L.nm_secButton, y)
+    y = y - 32
     add(ns.CreateCheck(parent, L.nm_showButton, y,
         function() return db().showButton end, set("showButton"),
         { tooltip = L.nm_showButton_tip }))
@@ -1070,7 +1206,7 @@ end
 
 function mod.Command(cmd)
     if cmd == "togglenames" then
-        local result = ToggleAll()
+        local result = ManualToggle()
         if result == true then
             ns.Print(L.nm_toggledOn)
         elseif result == false then
