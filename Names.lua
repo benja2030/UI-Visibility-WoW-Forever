@@ -797,6 +797,8 @@ end
 -- interface part had to wait because of combat (then nothing changes).
 local ToggleAll
 local lastActive = GetTime() -- last moment the player did something
+local uiHiddenByAddon = false -- this addon hid the interface
+local escPending = false      -- Esc showed it; hide it again when menus close
 
 -- What the player does by hand (buttons and command). It also forgets any
 -- automatic reason, so automatic rules never undo a manual choice, and
@@ -824,8 +826,10 @@ function ToggleAll()
     if shownAgain then
         -- Bringing names back always brings the interface back too.
         if uiHidden then UIParent:Show() end
+        uiHiddenByAddon, escPending = false, false
     elseif db.quickTarget == "target_all" then
         UIParent:Hide()
+        uiHiddenByAddon = true
     end
     UpdateToggleLook()
     for _, refresh in ipairs(optionRefreshers) do refresh() end
@@ -971,8 +975,42 @@ local function UpdateIdle(now)
     if now - lastActive >= db.autoIdleTime then AutoHide("idle") end
 end
 
+-- Pressing Esc while the interface is hidden makes the game show all of it
+-- with the menu (the menu is part of the interface, so it can't show alone).
+-- When the menu, and any window opened from it, is closed again, the
+-- interface goes back to hidden.
+local function MenusOpen()
+    if GameMenuFrame and GameMenuFrame:IsShown() then return true end
+    if SettingsPanel and SettingsPanel:IsShown() then return true end
+    if AddonList and AddonList:IsShown() then return true end
+    if UIVisibilityWindow and UIVisibilityWindow:IsShown() then return true end
+    if HelpFrame and HelpFrame:IsShown() then return true end
+    if MacroFrame and MacroFrame:IsShown() then return true end
+    return ns.IsEditMode()
+end
+
+if ToggleGameMenu then
+    hooksecurefunc("ToggleGameMenu", function()
+        if uiHiddenByAddon and UIParent:IsShown() then escPending = true end
+    end)
+end
+
+local function UpdateEscape()
+    if not escPending then return end
+    if not uiHiddenByAddon or not mod.db.worldNamesSaved then
+        escPending = false
+        return
+    end
+    if InCombatLockdown() or MenusOpen() then return end
+    escPending = false
+    if UIParent:IsShown() then UIParent:Hide() end
+end
+
 function UpdateAutoRules(now)
-    if mod.db then UpdateIdle(now) end
+    if mod.db then
+        UpdateIdle(now)
+        UpdateEscape()
+    end
 end
 
 local autoEvents = CreateFrame("Frame")
