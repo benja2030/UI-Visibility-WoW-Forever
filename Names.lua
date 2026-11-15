@@ -6,7 +6,9 @@
 -- character, the cursor is on top of it, and addons do know where the cursor
 -- is. So this module offers two things:
 --   * Name at the cursor: a big copy of the hovered character's name, in the
---     game's name colors, follows the cursor while you hover them.
+--     game's name colors, follows the cursor while you hover them. A quest
+--     mark can show next to it when the character is part of one of your
+--     active quests.
 --   * Tooltip at the cursor: the tooltip shows up next to the cursor instead
 --     of in the corner, optionally bigger.
 --
@@ -31,6 +33,8 @@ ns.AddLocale("en", {
     nm_position = "Position",
     above = "Above the cursor", right = "Right of the cursor", below = "Below the cursor",
     nm_skipPlates = "Skip characters close enough to have a nameplate",
+    nm_questMark = "Show a quest mark if the character is part of your quests",
+    nm_skipDead = "Don't show it for dead characters",
     nm_who = "Show it when hovering:",
     nm_alliedPlayers = "Allied players",
     nm_enemyPlayers = "Enemy players",
@@ -57,6 +61,8 @@ ns.AddLocale("es", {
     nm_position = "Posición",
     above = "Sobre el cursor", right = "A la derecha", below = "Bajo el cursor",
     nm_skipPlates = "Omitir personajes cercanos que ya tienen placa",
+    nm_questMark = "Mostrar una marca si el personaje es parte de tus misiones",
+    nm_skipDead = "No mostrarlo para personajes muertos",
     nm_who = "Mostrarlo al apuntar a:",
     nm_alliedPlayers = "Jugadores aliados",
     nm_enemyPlayers = "Jugadores enemigos",
@@ -84,6 +90,8 @@ local mod = {
         size = 20,
         position = "above",
         skipPlates = false,
+        questMark = true,
+        skipDead = true,
         alliedPlayers = true,
         enemyPlayers = true,
         friendlyNpcs = true,
@@ -127,6 +135,30 @@ local function HasNameplate()
     return ok and plate ~= nil
 end
 
+-- True if the hovered character is part of one of your active quests (a
+-- quest target, or someone you must talk to or kill). Uses the game's quest
+-- check, or the quest lines of its tooltip data if that check isn't there.
+local function IsQuestRelated()
+    if C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest then
+        local ok, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, "mouseover")
+        if ok and not ns.IsSecret(related) then return related and true or false end
+    end
+    if C_TooltipInfo and C_TooltipInfo.GetUnit and Enum and Enum.TooltipDataLineType then
+        local types = Enum.TooltipDataLineType
+        local ok, data = pcall(C_TooltipInfo.GetUnit, "mouseover")
+        if ok and data and data.lines then
+            for _, line in ipairs(data.lines) do
+                local kind = line.type
+                if kind and not ns.IsSecret(kind) and (kind == types.QuestObjective
+                    or kind == types.QuestTitle or kind == types.QuestPlayer) then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- True if the character under the mouse should get the name at the cursor.
 local function WantsHovered()
     local db = mod.db
@@ -139,6 +171,10 @@ local function WantsHovered()
         if inInstance and kind ~= "none" then return false end
     end
     if db.skipPlates and HasNameplate() then return false end
+    if db.skipDead then
+        local dead = UnitIsDead("mouseover")
+        if not ns.IsSecret(dead) and dead then return false end
+    end
     local isPlayer = UnitIsPlayer("mouseover")
     if ns.IsSecret(isPlayer) then
         return db.alliedPlayers or db.enemyPlayers or db.friendlyNpcs or db.hostileNpcs
@@ -176,6 +212,14 @@ label:SetAlpha(0)
 label:Hide()
 local text = label:CreateFontString(nil, "OVERLAY")
 
+-- Yellow "!" quest mark, to the left of the name.
+local mark = label:CreateTexture(nil, "OVERLAY")
+if not (mark.SetAtlas and pcall(mark.SetAtlas, mark, "QuestNormal")) then
+    mark:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
+end
+mark:SetPoint("RIGHT", text, "LEFT", -2, 0)
+mark:Hide()
+
 local OFFSETS = {
     above = { "BOTTOM", 0, 24 },
     right = { "LEFT", 28, 0 },
@@ -195,6 +239,7 @@ local function ApplyFont()
     end
     text:SetShadowOffset(1, -1)
     text:SetShadowColor(0, 0, 0, 1)
+    mark:SetSize(mod.db.size, mod.db.size)
     PlaceText()
 end
 
@@ -225,6 +270,8 @@ local function SetFromMouseover()
     if not ok or ns.IsSecret(r) or ns.IsSecret(g) or ns.IsSecret(b) or not r then
         r, g, b = 1, 0.82, 0
     end
+    mark:SetShown(mod.db.questMark and IsQuestRelated())
+
     -- Friendly players come back as pure blue, but the game draws their
     -- names in a lighter blue (measured in game: 102, 102, 255).
     if r < 0.05 and g < 0.05 and b > 0.95 then
@@ -391,6 +438,12 @@ function mod.BuildOptions(parent, y)
     y = y - 30
     add(ns.CreateCheck(parent, L.nm_skipPlates, y,
         function() return mod.db.skipPlates end, set("skipPlates")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_skipDead, y,
+        function() return mod.db.skipDead end, set("skipDead")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_questMark, y,
+        function() return mod.db.questMark end, set("questMark")))
     y = y - 34
 
     ns.CreateHeader(parent, L.nm_who, y)
