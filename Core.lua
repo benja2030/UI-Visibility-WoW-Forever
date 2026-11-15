@@ -177,23 +177,66 @@ end
 ---------------------------------------------------------------------------
 -- Option widgets shared by the modules
 ---------------------------------------------------------------------------
-function ns.CreateCheck(parent, label, y, getter, setter)
+-- A checkbox with a label. Optional "opts":
+--   x        horizontal position (default 16; use 32 or more to indent an
+--            option that depends on the one above, or ~210 for a second column)
+--   width    label width, so it doesn't run into a second column
+--   tooltip  explanation shown when the mouse is over the option
+--   enabledIf function; while it returns false the option is grayed out
+function ns.CreateCheck(parent, label, y, getter, setter, opts)
+    opts = opts or {}
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cb:SetPoint("TOPLEFT", 16, y)
+    cb:SetPoint("TOPLEFT", opts.x or 16, y)
     cb:SetSize(26, 26)
     local text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     text:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+    text:SetJustifyH("LEFT")
+    if opts.width then
+        text:SetWidth(opts.width)
+        text:SetWordWrap(false)
+    end
     text:SetText(label)
     cb:SetScript("OnClick", function(self)
         setter(self:GetChecked() and true or false)
     end)
-    return function() cb:SetChecked(getter()) end
+    if opts.tooltip then
+        local function show(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(label, 1, 0.82, 0)
+            GameTooltip:AddLine(opts.tooltip, 1, 1, 1, true)
+            GameTooltip:Show()
+        end
+        cb:SetScript("OnEnter", show)
+        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        -- The label is part of the option too.
+        cb:SetHitRectInsets(0, -(opts.width or text:GetStringWidth()) - 4, 0, 0)
+    end
+    return function()
+        cb:SetChecked(getter())
+        if opts.enabledIf then
+            local on = opts.enabledIf() and true or false
+            cb:SetEnabled(on)
+            if on then text:SetTextColor(1, 1, 1) else text:SetTextColor(0.5, 0.5, 0.5) end
+        end
+    end
 end
 
 function ns.CreateHeader(parent, text, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("TOPLEFT", 18, y)
     fs:SetText(text)
+end
+
+-- A section title with a thin line under it. Takes about 30 pixels.
+function ns.CreateSection(parent, text, y)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    fs:SetPoint("TOPLEFT", 16, y)
+    fs:SetText(text)
+    local line = parent:CreateTexture(nil, "ARTWORK")
+    line:SetColorTexture(1, 0.82, 0, 0.25)
+    line:SetHeight(1)
+    line:SetPoint("TOPLEFT", 16, y - 20)
+    line:SetPoint("RIGHT", parent, "RIGHT", -16, 0)
 end
 
 function ns.CreateNote(parent, text, y)

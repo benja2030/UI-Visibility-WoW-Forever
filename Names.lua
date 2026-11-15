@@ -29,29 +29,49 @@ local POSITIONS = { "above", "right", "below" }
 ns.AddLocale("en", {
     tab_names = "Names",
     nm_title = "Character Names",
-    nm_cursorName = "Show the hovered character's name at the cursor",
-    nm_size = "Name size",
+
+    nm_secName = "Name at the cursor",
+    nm_cursorName = "Show name",
+    nm_cursorName_tip = "Shows the hovered character's name in big letters next to the cursor.",
+    nm_size = "Size",
     nm_position = "Position",
     above = "Above the cursor", right = "Right of the cursor", below = "Below the cursor",
-    nm_skipPlates = "Skip characters close enough to have a nameplate",
-    nm_questMark = "Show a quest mark if the character is part of your quests",
-    nm_showLevel = "Show the character's level",
-    nm_levelColor = "    Color the level by difficulty",
-    nm_skipDead = "Don't show it for dead characters",
-    nm_who = "Show it when hovering:",
+    nm_delay = "Delay",
+    nm_showLevel = "Level",
+    nm_showLevel_tip = "Shows the level after the name, like (32). Elites get a +, and (??) means too high to see.",
+    nm_levelColor = "Difficulty colors",
+    nm_levelColor_tip = "Colors the level by how hard the character is for you. Off: the level uses the name's color.",
+    nm_questMark = "Quest mark",
+    nm_questMark_tip = "Shows a ! before the name when the character is part of one of your active quests.",
+
+    nm_secWho = "Show for",
     nm_alliedPlayers = "Allied players",
     nm_enemyPlayers = "Enemy players",
-    nm_friendlyNpcs = "Friendly and neutral NPCs",
+    nm_enemyPlayers_tip = "Players of the other faction, flagged for PvP or not.",
+    nm_friendlyNpcs = "Friendly NPCs",
+    nm_friendlyNpcs_tip = "NPCs you can't attack, including neutral ones (yellow names).",
     nm_hostileNpcs = "Hostile NPCs",
-    nm_worldOnly = "Only when hovering characters in the world",
-    nm_delay = "Name delay",
-    nm_tooltipDelay = "Tooltip delay",
-    nm_hideCombat = "Don't show it in combat",
-    nm_hideInstances = "Don't show it in dungeons, raids and battlegrounds",
-    nm_tooltipHeader = "Tooltip:",
-    nm_tooltipCursor = "Show the tooltip next to the cursor",
-    nm_tooltipScale = "Tooltip size",
-    nm_note = "The tooltip delay only applies to characters and objects in the world, not to buttons or windows. The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor.",
+    nm_hostileNpcs_tip = "NPCs you can attack.",
+
+    nm_secHide = "Hide when",
+    nm_hideCombat = "In combat",
+    nm_hideInstances = "In an instance",
+    nm_hideInstances_tip = "Dungeons, raids and battlegrounds.",
+    nm_skipDead = "Dead",
+    nm_skipDead_tip = "Corpses of NPCs and dead players.",
+    nm_skipPlates = "Has a nameplate",
+    nm_skipPlates_tip = "The character is close enough to show its nameplate, so you can already read its name.",
+    nm_worldOnly = "Over the interface",
+    nm_worldOnly_tip = "The mouse is over an interface frame (like the party or target frame) instead of the world.",
+
+    nm_secTooltip = "Tooltip",
+    nm_tooltipCursor = "Next to the cursor",
+    nm_tooltipCursor_tip = "Shows the tooltip next to the cursor instead of in the corner of the screen.",
+    nm_tooltipScale = "Size",
+    nm_tooltipDelay = "Delay",
+    nm_tooltipNote = "The delay only applies to characters and objects in the world, not to buttons or windows.",
+
+    nm_note = "The game doesn't let addons know where a character's head is on screen, so the name follows the cursor instead.",
     nm_st_disabled = "module disabled",
     nm_st_showing = "showing %s at the cursor",
     nm_st_idle = "waiting for the mouse",
@@ -59,29 +79,49 @@ ns.AddLocale("en", {
 ns.AddLocale("es", {
     tab_names = "Nombres",
     nm_title = "Nombres de personajes",
-    nm_cursorName = "Mostrar el nombre del personaje apuntado junto al cursor",
-    nm_size = "Tamaño del nombre",
+
+    nm_secName = "Nombre junto al cursor",
+    nm_cursorName = "Mostrar nombre",
+    nm_cursorName_tip = "Muestra el nombre del personaje apuntado en letras grandes junto al cursor.",
+    nm_size = "Tamaño",
     nm_position = "Posición",
     above = "Sobre el cursor", right = "A la derecha", below = "Bajo el cursor",
-    nm_skipPlates = "Omitir personajes cercanos que ya tienen placa",
-    nm_questMark = "Mostrar una marca si el personaje es parte de tus misiones",
-    nm_showLevel = "Mostrar el nivel del personaje",
-    nm_levelColor = "    Colorear el nivel por dificultad",
-    nm_skipDead = "No mostrarlo para personajes muertos",
-    nm_who = "Mostrarlo al apuntar a:",
+    nm_delay = "Retraso",
+    nm_showLevel = "Nivel",
+    nm_showLevel_tip = "Muestra el nivel después del nombre, como (32). Los élites llevan un +, y (??) significa que es demasiado alto para verlo.",
+    nm_levelColor = "Colores de dificultad",
+    nm_levelColor_tip = "Colorea el nivel según qué tan difícil es el personaje para ti. Desactivado: el nivel usa el color del nombre.",
+    nm_questMark = "Marca de misión",
+    nm_questMark_tip = "Muestra un ! antes del nombre cuando el personaje es parte de una de tus misiones activas.",
+
+    nm_secWho = "Mostrar para",
     nm_alliedPlayers = "Jugadores aliados",
     nm_enemyPlayers = "Jugadores enemigos",
-    nm_friendlyNpcs = "PNJ amistosos y neutrales",
+    nm_enemyPlayers_tip = "Jugadores de la otra facción, con o sin JcJ activado.",
+    nm_friendlyNpcs = "PNJ amistosos",
+    nm_friendlyNpcs_tip = "PNJ que no puedes atacar, incluidos los neutrales (nombres amarillos).",
     nm_hostileNpcs = "PNJ hostiles",
-    nm_worldOnly = "Solo al apuntar personajes en el mundo",
-    nm_delay = "Retraso del nombre",
-    nm_tooltipDelay = "Retraso del tooltip",
-    nm_hideCombat = "No mostrarlo en combate",
-    nm_hideInstances = "No mostrarlo en mazmorras, bandas y campos de batalla",
-    nm_tooltipHeader = "Tooltip:",
-    nm_tooltipCursor = "Mostrar el tooltip junto al cursor",
-    nm_tooltipScale = "Tamaño del tooltip",
-    nm_note = "El retraso del tooltip solo se aplica a personajes y objetos del mundo, no a botones ni ventanas. El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor.",
+    nm_hostileNpcs_tip = "PNJ que puedes atacar.",
+
+    nm_secHide = "Ocultar cuando",
+    nm_hideCombat = "Estás en combate",
+    nm_hideInstances = "Estás en instancia",
+    nm_hideInstances_tip = "Mazmorras, bandas y campos de batalla.",
+    nm_skipDead = "Está muerto",
+    nm_skipDead_tip = "Cadáveres de PNJ y jugadores muertos.",
+    nm_skipPlates = "Tiene placa",
+    nm_skipPlates_tip = "El personaje está lo bastante cerca para mostrar su placa, así que ya puedes leer su nombre.",
+    nm_worldOnly = "Sobre la interfaz",
+    nm_worldOnly_tip = "El mouse está sobre un marco de la interfaz (como el del grupo o el del objetivo) en vez del mundo.",
+
+    nm_secTooltip = "Tooltip",
+    nm_tooltipCursor = "Junto al cursor",
+    nm_tooltipCursor_tip = "Muestra el tooltip junto al cursor en vez de en la esquina de la pantalla.",
+    nm_tooltipScale = "Tamaño",
+    nm_tooltipDelay = "Retraso",
+    nm_tooltipNote = "El retraso solo se aplica a personajes y objetos del mundo, no a botones ni ventanas.",
+
+    nm_note = "El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre sigue al cursor.",
     nm_st_disabled = "módulo desactivado",
     nm_st_showing = "mostrando a %s junto al cursor",
     nm_st_idle = "esperando el mouse",
@@ -448,80 +488,109 @@ end
 function mod.BuildOptions(parent, y)
     local refreshers = {}
     local function add(r) refreshers[#refreshers + 1] = r end
-    local function set(key) return function(v) mod.db[key] = v end end
+    local function refreshAll() for _, r in ipairs(refreshers) do r() end end
+    local function set(key) return function(v) mod.db[key] = v; refreshAll() end end
+    local function db() return mod.db end
+
+    local COL1, COL2, INDENT, WIDTH = 16, 216, 40, 160
+    local nameOn = function() return db().cursorName end
+    local levelOn = function() return db().cursorName and db().showLevel end
 
     add(ns.CreateCheck(parent, L.enabled, y,
-        function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
-    y = y - 36
+        function() return db().enabled end, function(v) mod.SetEnabled(v) end))
+    y = y - 40
 
+    -- Name at the cursor
+    ns.CreateSection(parent, L.nm_secName, y)
+    y = y - 32
     add(ns.CreateCheck(parent, L.nm_cursorName, y,
-        function() return mod.db.cursorName end, set("cursorName")))
+        function() return db().cursorName end, set("cursorName"),
+        { tooltip = L.nm_cursorName_tip }))
     y = y - 34
     add(ns.CreateSlider(parent, L.nm_size, y,
-        function() return mod.db.size end,
-        function(v) mod.db.size = v; ApplyFont() end, 10, 40,
+        function() return db().size end,
+        function(v) db().size = v; ApplyFont() end, 10, 40,
         function(v) return tostring(math.floor(v + 0.5)) end))
     y = y - 32
     add(ns.CreateDropdown(parent, L.nm_position, y, POSITIONS,
-        function() return mod.db.position end,
-        function(v) mod.db.position = v; PlaceText() end))
+        function() return db().position end,
+        function(v) db().position = v; PlaceText() end))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_delay, y,
-        function() return mod.db.delay end, set("delay"), 0, 10, 1,
+        function() return db().delay end, set("delay"), 0, 10, 1,
         function(v) return string.format("%.1f s", v / 10) end))
-    y = y - 30
-    add(ns.CreateCheck(parent, L.nm_skipPlates, y,
-        function() return mod.db.skipPlates end, set("skipPlates")))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.nm_skipDead, y,
-        function() return mod.db.skipDead end, set("skipDead")))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.nm_questMark, y,
-        function() return mod.db.questMark end, set("questMark")))
-    y = y - 28
+    y = y - 32
     add(ns.CreateCheck(parent, L.nm_showLevel, y,
-        function() return mod.db.showLevel end, set("showLevel")))
-    y = y - 28
+        function() return db().showLevel end, set("showLevel"),
+        { x = COL1, width = WIDTH, tooltip = L.nm_showLevel_tip, enabledIf = nameOn }))
+    add(ns.CreateCheck(parent, L.nm_questMark, y,
+        function() return db().questMark end, set("questMark"),
+        { x = COL2, width = WIDTH, tooltip = L.nm_questMark_tip, enabledIf = nameOn }))
+    y = y - 26
     add(ns.CreateCheck(parent, L.nm_levelColor, y,
-        function() return mod.db.levelColor end, set("levelColor")))
-    y = y - 34
+        function() return db().levelColor end, set("levelColor"),
+        { x = INDENT, width = WIDTH, tooltip = L.nm_levelColor_tip, enabledIf = levelOn }))
+    y = y - 40
 
-    ns.CreateHeader(parent, L.nm_who, y)
-    y = y - 22
-    for _, item in ipairs({
-        { "nm_alliedPlayers", "alliedPlayers" }, { "nm_enemyPlayers", "enemyPlayers" },
-        { "nm_friendlyNpcs", "friendlyNpcs" }, { "nm_hostileNpcs", "hostileNpcs" },
+    -- Show for
+    ns.CreateSection(parent, L.nm_secWho, y)
+    y = y - 32
+    for _, row in ipairs({
+        { "alliedPlayers", "enemyPlayers" },
+        { "friendlyNpcs", "hostileNpcs" },
     }) do
-        add(ns.CreateCheck(parent, L[item[1]], y,
-            function() return mod.db[item[2]] end, set(item[2])))
+        for col, key in ipairs(row) do
+            add(ns.CreateCheck(parent, L["nm_" .. key], y,
+                function() return db()[key] end, set(key),
+                { x = col == 1 and COL1 or COL2, width = WIDTH,
+                  tooltip = L["nm_" .. key .. "_tip"] ~= "nm_" .. key .. "_tip" and L["nm_" .. key .. "_tip"] or nil,
+                  enabledIf = nameOn }))
+        end
         y = y - 28
     end
-    add(ns.CreateCheck(parent, L.nm_worldOnly, y,
-        function() return mod.db.worldOnly end, set("worldOnly")))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.nm_hideCombat, y,
-        function() return mod.db.hideCombat end, set("hideCombat")))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.nm_hideInstances, y,
-        function() return mod.db.hideInstances end, set("hideInstances")))
-    y = y - 38
+    y = y - 12
 
-    ns.CreateHeader(parent, L.nm_tooltipHeader, y)
-    y = y - 22
-    add(ns.CreateCheck(parent, L.nm_tooltipCursor, y,
-        function() return mod.db.tooltipCursor end, set("tooltipCursor")))
+    -- Hide when
+    ns.CreateSection(parent, L.nm_secHide, y)
     y = y - 32
+    for _, row in ipairs({
+        { "hideCombat", "hideInstances" },
+        { "skipDead", "skipPlates" },
+        { "worldOnly" },
+    }) do
+        for col, key in ipairs(row) do
+            local tip = L["nm_" .. key .. "_tip"]
+            add(ns.CreateCheck(parent, L["nm_" .. key], y,
+                function() return db()[key] end, set(key),
+                { x = col == 1 and COL1 or COL2, width = WIDTH,
+                  tooltip = tip ~= "nm_" .. key .. "_tip" and tip or nil,
+                  enabledIf = nameOn }))
+        end
+        y = y - 28
+    end
+    y = y - 12
+
+    -- Tooltip
+    ns.CreateSection(parent, L.nm_secTooltip, y)
+    y = y - 32
+    add(ns.CreateCheck(parent, L.nm_tooltipCursor, y,
+        function() return db().tooltipCursor end, set("tooltipCursor"),
+        { tooltip = L.nm_tooltipCursor_tip }))
+    y = y - 34
     add(ns.CreateSlider(parent, L.nm_tooltipScale, y,
-        function() return mod.db.tooltipScale end, set("tooltipScale"), 50, 200,
+        function() return db().tooltipScale end, set("tooltipScale"), 50, 200,
         function(v) return math.floor(v + 0.5) .. "%" end))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_tooltipDelay, y,
-        function() return mod.db.tooltipDelay end, set("tooltipDelay"), 0, 10, 1,
+        function() return db().tooltipDelay end, set("tooltipDelay"), 0, 10, 1,
         function(v) return string.format("%.1f s", v / 10) end))
+    y = y - 28
+    ns.CreateNote(parent, L.nm_tooltipNote, y)
     y = y - 40
+
     ns.CreateNote(parent, L.nm_note, y)
 
-    return function() for _, r in ipairs(refreshers) do r() end end
+    return refreshAll
 end
 
 function mod.PrintStatus()
