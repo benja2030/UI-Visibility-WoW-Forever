@@ -21,6 +21,8 @@ ns.AddLocale("en", {
     tab_prd = "Resources",
     prd_title = "Personal Resource Display",
     prd_secOpacity = "Opacity",
+    prd_opacityNote = "How visible the display is in combat, while you regenerate out of combat, and when everything is full.",
+    prd_trackedNote = "While these change out of combat, the display uses the Regenerating opacity. When they stop, it uses Full bars.",
     prd_secTracked = "Counts as regenerating",
     prd_secText = "Bar text",
     prd_secTiming = "Timing",
@@ -49,6 +51,8 @@ ns.AddLocale("es", {
     tab_prd = "Recursos",
     prd_title = "Personal Resource Display",
     prd_secOpacity = "Opacidad",
+    prd_opacityNote = "Qué tan visible es el display en combate, mientras regeneras fuera de combate, y cuando todo está lleno.",
+    prd_trackedNote = "Mientras estos cambian fuera de combate, el display usa la opacidad Regenerando. Cuando se detienen, usa Barras llenas.",
     prd_secTracked = "Cuenta como regeneración",
     prd_secText = "Texto de las barras",
     prd_secTiming = "Tiempos",
@@ -430,7 +434,8 @@ function mod.BuildOptions(parent, y)
     y = y - 40
 
     ns.CreateSection(parent, L.prd_secOpacity, y)
-    y = y - 32
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.prd_opacityNote, y) - 14
     for _, item in ipairs({
         { "prd_inCombat", "alphaCombat" }, { "prd_regen", "alphaRegen" }, { "prd_full", "alphaIdle" },
     }) do
@@ -441,7 +446,8 @@ function mod.BuildOptions(parent, y)
     y = y - 12
 
     ns.CreateSection(parent, L.prd_secTracked, y)
-    y = y - 32
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - 12
     local items = {
         { "prd_health", function() return db().health end, function(v) db().health = v end },
     }

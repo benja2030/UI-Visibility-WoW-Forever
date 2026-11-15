@@ -51,6 +51,15 @@ ns.AddLocale("en", {
     page_bars = "Bars",
     page_frames = "Frames",
     sec_modules = "Modules",
+    generalIntro = "UI Visibility lets you choose when each part of the interface is visible. Turn modules on or off here, and press Open to set each one up. Hover any option to see what it does.",
+    desc_actionbars = "Hide your action bars, or show them only on mouse hover.",
+    desc_bars = "Hide the stance, pet, possess and totem bars, or show them on hover.",
+    desc_xp = "Shows the experience bar only on hover and after gaining experience.",
+    desc_unitframes = "Hide unit frames like player, target and party, or show them on hover.",
+    desc_prd = "Fades the health and resource bars under your character with combat and regeneration.",
+    desc_interface = "Hide the chat, quest trackers, buffs, bags and main menu, or show them on hover.",
+    desc_minimap = "Hide the texts and buttons around the minimap, or show them on hover.",
+    desc_names = "Shows the name of the character under your cursor, and controls the names above heads.",
     sec_appearance = "Appearance",
     sec_language = "Language and help",
     open = "Open",
@@ -88,6 +97,15 @@ ns.AddLocale("es", {
     page_bars = "Barras",
     page_frames = "Marcos",
     sec_modules = "Módulos",
+    generalIntro = "UI Visibility te deja elegir cuándo se ve cada parte de la interfaz. Activa o desactiva los módulos aquí, y pulsa Abrir para configurar cada uno. Pasa el mouse sobre cualquier opción para ver qué hace.",
+    desc_actionbars = "Oculta tus barras de acción, o muéstralas solo al pasar el mouse.",
+    desc_bars = "Oculta las barras de posturas, mascota, posesión y tótems, o muéstralas al pasar el mouse.",
+    desc_xp = "Muestra la barra de experiencia solo al pasar el mouse y al ganar experiencia.",
+    desc_unitframes = "Oculta marcos como el del jugador, el objetivo y el grupo, o muéstralos al pasar el mouse.",
+    desc_prd = "Desvanece las barras de vida y recurso bajo tu personaje según el combate y la regeneración.",
+    desc_interface = "Oculta el chat, las misiones, los beneficios, las bolsas y el menú, o muéstralos al pasar el mouse.",
+    desc_minimap = "Oculta los textos y botones alrededor del minimapa, o muéstralos al pasar el mouse.",
+    desc_names = "Muestra el nombre del personaje bajo el cursor y controla los nombres sobre la cabeza.",
     sec_appearance = "Apariencia",
     sec_language = "Idioma y ayuda",
     open = "Abrir",
@@ -323,12 +341,80 @@ function ns.CreateSection(parent, text, y)
     line:SetPoint("RIGHT", parent, "RIGHT", -16, 0)
 end
 
-function ns.CreateNote(parent, text, y)
+-- A small gray explanation. Returns its height, so the next option can go
+-- right below it however many lines it takes.
+function ns.CreateNote(parent, text, y, width)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     fs:SetPoint("TOPLEFT", 18, y)
-    fs:SetWidth(380)
+    fs:SetWidth(width or 380)
     fs:SetJustifyH("LEFT")
     fs:SetText(text)
+    return math.ceil(fs:GetStringHeight())
+end
+
+-- Icon of each module, shown in the General tab.
+local MODULE_ICONS = {
+    actionbars = "Interface\\Icons\\Ability_DualWield",
+    bars       = "Interface\\Icons\\Ability_Warrior_DefensiveStance",
+    xp         = "Interface\\Icons\\INV_Scroll_03",
+    unitframes = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+    prd        = "Interface\\Icons\\Spell_Holy_Renew",
+    interface  = "Interface\\Icons\\INV_Misc_Bag_08",
+    minimap    = "Interface\\Icons\\INV_Misc_Map_01",
+    names      = "Interface\\Icons\\Spell_Holy_MindVision",
+}
+
+-- Description of a module, or nil.
+function ns.ModuleDescription(mod)
+    local key = "desc_" .. mod.key
+    local text = L[key]
+    if text ~= key then return text end
+end
+
+-- A row for the General tab: icon, name, description, Open button and the
+-- checkbox that turns the module on or off. Takes 56 pixels.
+local function CreateModuleRow(parent, mod, y, index, onOpen)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y)
+    row:SetPoint("RIGHT", parent, "RIGHT", -8, 0)
+    row:SetHeight(52)
+
+    local band = row:CreateTexture(nil, "BACKGROUND")
+    band:SetAllPoints()
+    band:SetColorTexture(0, 0, 0, index % 2 == 1 and 0.35 or 0.2)
+
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(36, 36)
+    icon:SetPoint("LEFT", 8, 0)
+    icon:SetTexture(MODULE_ICONS[mod.key] or ns.ICON)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    check:SetSize(26, 26)
+    check:SetPoint("RIGHT", -6, 0)
+    check:SetScript("OnClick", function(self) mod.SetEnabled(self:GetChecked() and true or false) end)
+
+    local open = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    open:SetSize(76, 22)
+    open:SetPoint("RIGHT", check, "LEFT", -6, 0)
+    open:SetText(L.open)
+    open:SetScript("OnClick", function() onOpen(mod) end)
+
+    local title = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 10, -1)
+    title:SetPoint("RIGHT", open, "LEFT", -8, 0)
+    title:SetJustifyH("LEFT")
+    title:SetText(L[mod.titleKey])
+
+    local desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+    desc:SetPoint("RIGHT", open, "LEFT", -8, 0)
+    desc:SetJustifyH("LEFT")
+    desc:SetTextColor(0.75, 0.75, 0.75)
+    desc:SetMaxLines(2)
+    desc:SetText(ns.ModuleDescription(mod) or "")
+
+    return function() check:SetChecked(mod.db.enabled) end
 end
 
 function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, suffix, opts)
@@ -687,17 +773,13 @@ end
 local function BuildGeneral(parent, y, openModule)
     local refreshers = {}
 
+    y = y - ns.CreateNote(parent, L.generalIntro, y - 2) - 16
+
     ns.CreateSection(parent, L.sec_modules, y)
     y = y - 32
-    for _, mod in ipairs(ns.moduleList) do
-        refreshers[#refreshers + 1] = ns.CreateCheck(parent, L[mod.titleKey], y,
-            function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end)
-        local open = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-        open:SetSize(80, 22)
-        open:SetPoint("TOPLEFT", 280, y - 2)
-        open:SetText(L.open)
-        open:SetScript("OnClick", function() openModule(mod) end)
-        y = y - 28
+    for i, mod in ipairs(ns.moduleList) do
+        refreshers[#refreshers + 1] = CreateModuleRow(parent, mod, y, i, openModule)
+        y = y - 56
     end
     y = y - 12
 
@@ -778,7 +860,10 @@ end
 -- Builds a page's options into "parent". Returns a refresh function.
 local function BuildPage(page, parent, y)
     if #page.mods == 1 then
-        return page.mods[1].BuildOptions(parent, y)
+        local mod = page.mods[1]
+        local desc = ns.ModuleDescription(mod)
+        if desc then y = y - ns.CreateNote(parent, desc, y - 2) - 14 end
+        return mod.BuildOptions(parent, y)
     end
     local refreshers, blocks = {}, {}
     for i, mod in ipairs(page.mods) do
@@ -787,7 +872,10 @@ local function BuildPage(page, parent, y)
         block:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
         block:SetHeight(1)
         ns.CreateModuleTitle(block, L[mod.titleKey], -2)
-        refreshers[#refreshers + 1] = mod.BuildOptions(block, -46)
+        local top = -44
+        local desc = ns.ModuleDescription(mod)
+        if desc then top = top - ns.CreateNote(block, desc, top) - 12 end
+        refreshers[#refreshers + 1] = mod.BuildOptions(block, top)
         FitContent(block)
         y = y - block:GetHeight() - 20
         blocks[i] = block

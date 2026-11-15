@@ -28,6 +28,7 @@ ns.AddLocale("en", {
     minimapHover_tip = "Hovering the minimap shows every element in On hover mode.",
     sec_options = "Options",
     sec_elements = "Elements",
+    modesNote = "Shown: the game's normal behavior. Hidden: invisible, and it ignores the mouse. On hover: invisible until the mouse passes over it.",
     modesHeader = "Elements",
     st_notShown = "not shown right now",
     st_edit = "Edit Mode",
@@ -41,6 +42,7 @@ ns.AddLocale("es", {
     minimapHover_tip = "Apuntar al minimapa muestra todos los elementos en modo Con el mouse.",
     sec_options = "Opciones",
     sec_elements = "Elementos",
+    modesNote = "Visible: el comportamiento normal del juego. Oculto: invisible, y no responde al mouse. Con el mouse: invisible hasta que el mouse pasa por encima.",
     modesHeader = "Elementos",
     st_notShown = "no se muestra ahora",
     st_edit = "Modo Edición",
@@ -295,7 +297,8 @@ function ns.NewElementsModule(cfg)
         y = y - 12
 
         ns.CreateSection(parent, L.sec_elements, y)
-        y = y - 34
+        y = y - 30
+        y = y - ns.CreateNote(parent, L.modesNote, y) - 16
         for _, element in ipairs(cfg.elements) do
             add(ns.CreateDropdown(parent, L[element.label], y, MODES,
                 function() return mod.db.modes[element.key] end,

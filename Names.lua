@@ -35,6 +35,9 @@ ns.AddLocale("en", {
     nm_title = "Character Names",
 
     nm_secName = "Name at the cursor",
+    nm_nameNote = "While you hover a player or NPC, their name appears in big letters next to the cursor, so you can read it at any distance.",
+    nm_quickNote = "Hides every name above heads at once, and brings them back exactly as they were.",
+    nm_tooltipSecNote = "Changes the game's tooltip, the box with information that appears when you hover something.",
     nm_cursorName = "Show name",
     nm_cursorName_tip = "Shows the hovered character's name in big letters next to the cursor.",
     nm_size = "Size",
@@ -101,6 +104,18 @@ ns.AddLocale("en", {
     nm_toggleNote = "Tip: /uiv togglenames does the same in a macro.",
     nm_toggledOff = "names above heads hidden. Use /uiv togglenames to bring them back.",
     nm_toggledOn = "names above heads shown again.",
+    nm_secQuick = "Quick toggle",
+    nm_showButton = "Button on screen",
+    nm_showButton_tip = "Shows a small button that hides or shows all names above heads with one click.",
+    nm_buttonMode = "Button mode",
+    nm_buttonIdle = "Opacity away",
+    nm_buttonIdle_tip = "In On hover mode, the button's opacity while the mouse isn't over it. 0% makes it invisible until you hover where it is.",
+    nm_buttonSize = "Button size",
+    nm_resetPos = "Reset position",
+    nm_moveNote = "Shift+drag the button to move it.",
+    nm_btnShown = "Names are shown. Click to hide them all.",
+    nm_btnHidden = "Names are hidden. Click to show them again.",
+    nm_btnMove = "Shift+drag to move.",
     nm_secTooltip = "Tooltip",
     nm_tooltipCursor = "Next to the cursor",
     nm_tooltipCursor_tip = "Shows the tooltip next to the cursor instead of in the corner of the screen.",
@@ -118,6 +133,9 @@ ns.AddLocale("es", {
     nm_title = "Nombres de personajes",
 
     nm_secName = "Nombre junto al cursor",
+    nm_nameNote = "Mientras apuntas a un jugador o PNJ, su nombre aparece en grande junto al cursor, para que puedas leerlo a cualquier distancia.",
+    nm_quickNote = "Oculta todos los nombres sobre la cabeza a la vez, y los vuelve a mostrar exactamente como estaban.",
+    nm_tooltipSecNote = "Cambia el tooltip del juego, el recuadro con información que aparece al pasar el mouse sobre algo.",
     nm_cursorName = "Mostrar nombre",
     nm_cursorName_tip = "Muestra el nombre del personaje apuntado en letras grandes junto al cursor.",
     nm_size = "Tamaño",
@@ -184,6 +202,18 @@ ns.AddLocale("es", {
     nm_toggleNote = "Consejo: /uiv togglenames hace lo mismo en una macro.",
     nm_toggledOff = "nombres sobre la cabeza ocultos. Usa /uiv togglenames para volver a mostrarlos.",
     nm_toggledOn = "nombres sobre la cabeza visibles otra vez.",
+    nm_secQuick = "Alternar rápido",
+    nm_showButton = "Botón en pantalla",
+    nm_showButton_tip = "Muestra un botón pequeño que oculta o muestra todos los nombres sobre la cabeza con un clic.",
+    nm_buttonMode = "Modo del botón",
+    nm_buttonIdle = "Opacidad sin mouse",
+    nm_buttonIdle_tip = "En modo Con el mouse, la opacidad del botón mientras el mouse no está encima. 0% lo vuelve invisible hasta que pasas el mouse por donde está.",
+    nm_buttonSize = "Tamaño del botón",
+    nm_resetPos = "Reiniciar posición",
+    nm_moveNote = "Mantén Shift y arrastra el botón para moverlo.",
+    nm_btnShown = "Los nombres están visibles. Haz clic para ocultarlos todos.",
+    nm_btnHidden = "Los nombres están ocultos. Haz clic para mostrarlos otra vez.",
+    nm_btnMove = "Shift+arrastrar para mover.",
     nm_secTooltip = "Tooltip",
     nm_tooltipCursor = "Junto al cursor",
     nm_tooltipCursor_tip = "Muestra el tooltip junto al cursor en vez de en la esquina de la pantalla.",
@@ -219,7 +249,12 @@ local mod = {
         hideInstances = false,
         tooltipCursor = false,
         tooltipScale = 100,
-        tooltipDelay = 0,   -- tenths of a second before world tooltips show
+        tooltipDelay = 0,
+        showButton = false,
+        buttonMode = "shown",   -- "shown" or "hover"
+        buttonIdleAlpha = 30,   -- % while not hovered, in "hover" mode
+        buttonSize = 32,
+        buttonPoint = nil,      -- saved position   -- tenths of a second before world tooltips show
     },
 }
 ns.RegisterModule(mod)
@@ -426,9 +461,11 @@ end
 
 local lastGUID
 local UpdateTooltipDelay -- defined in the tooltip section
+local UpdateToggleButton -- defined in the quick toggle section
 
 function mod.OnTick(now)
     UpdateTooltipDelay(now)
+    UpdateToggleButton(now)
     local db = mod.db
     local want = db.enabled and db.cursorName and WantsHovered()
     if want then
@@ -615,6 +652,111 @@ local function ToggleWorldNames()
 end
 
 ---------------------------------------------------------------------------
+-- Quick toggle: button on screen
+---------------------------------------------------------------------------
+local optionRefreshers = {} -- open option pages, refreshed after a toggle
+local BUTTON_LINGER = 0.3
+
+local toggle = CreateFrame("Button", "UIVisibilityNamesButton", UIParent)
+toggle:SetFrameStrata("MEDIUM")
+toggle:SetClampedToScreen(true)
+toggle:SetMovable(true)
+toggle:RegisterForDrag("LeftButton")
+toggle:RegisterForClicks("LeftButtonUp")
+toggle:SetAlpha(0)
+toggle:Hide()
+
+local toggleBorder = toggle:CreateTexture(nil, "BACKGROUND")
+toggleBorder:SetPoint("TOPLEFT", -1, 1)
+toggleBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+toggleBorder:SetColorTexture(0, 0, 0, 0.8)
+
+local toggleIcon = toggle:CreateTexture(nil, "ARTWORK")
+toggleIcon:SetAllPoints()
+toggleIcon:SetTexture("Interface\\Icons\\Spell_Holy_MindVision")
+toggleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+local toggleCross = toggle:CreateTexture(nil, "OVERLAY")
+toggleCross:SetPoint("CENTER")
+toggleCross:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+
+toggle:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+
+-- Gray icon with a red cross while names are hidden.
+local function UpdateToggleLook()
+    local hidden = mod.db and mod.db.worldNamesSaved ~= nil
+    toggleIcon:SetDesaturated(hidden)
+    toggleCross:SetShown(hidden)
+end
+
+local function ShowToggleTooltip(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L.nm_secWorld, 1, 0.82, 0)
+    GameTooltip:AddLine(mod.db.worldNamesSaved and L.nm_btnHidden or L.nm_btnShown, 1, 1, 1, true)
+    GameTooltip:AddLine(L.nm_btnMove, 0.6, 0.6, 0.6, true)
+    GameTooltip:Show()
+end
+
+-- Toggles the names and updates everything that shows their state.
+local function ToggleAll()
+    local shownAgain = ToggleWorldNames()
+    UpdateToggleLook()
+    for _, refresh in ipairs(optionRefreshers) do refresh() end
+    if toggle:IsMouseOver() and GameTooltip:IsOwned(toggle) then ShowToggleTooltip(toggle) end
+    return shownAgain
+end
+
+local function ApplyToggleLayout()
+    local db = mod.db
+    toggle:SetSize(db.buttonSize, db.buttonSize)
+    toggleCross:SetSize(db.buttonSize * 0.7, db.buttonSize * 0.7)
+    toggle:ClearAllPoints()
+    local p = db.buttonPoint
+    if p then
+        toggle:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+    else
+        toggle:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+    end
+    UpdateToggleLook()
+end
+
+toggle:SetScript("OnClick", function()
+    if IsShiftKeyDown() then return end -- Shift is for moving
+    ToggleAll()
+end)
+toggle:SetScript("OnDragStart", function(self)
+    if IsShiftKeyDown() then self:StartMoving() end
+end)
+toggle:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, relativePoint, x, y = self:GetPoint(1)
+    mod.db.buttonPoint = { point, relativePoint, x, y }
+end)
+toggle:SetScript("OnEnter", ShowToggleTooltip)
+toggle:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local toggleHoverUntil = 0
+
+-- Called every tick: shows, hides and fades the button.
+function UpdateToggleButton(now)
+    local db = mod.db
+    if not (db and db.enabled and db.showButton) then
+        if toggle:IsShown() then toggle:Hide() end
+        return
+    end
+    if not toggle:IsShown() then
+        toggle:SetAlpha(db.buttonMode == "hover" and db.buttonIdleAlpha / 100 or 1)
+        toggle:Show()
+    end
+    local target = 1
+    if db.buttonMode == "hover" and not ns.IsEditMode() then
+        if ns.IsCursorOver(toggle) then toggleHoverUntil = now + BUTTON_LINGER end
+        if now >= toggleHoverUntil then target = db.buttonIdleAlpha / 100 end
+    end
+    ns.Fade(toggle, target)
+end
+
+---------------------------------------------------------------------------
 -- Module hooks
 ---------------------------------------------------------------------------
 function mod.SetEnabled(v)
@@ -623,6 +765,7 @@ end
 
 function mod.OnLogin()
     ApplyFont()
+    ApplyToggleLayout()
     HookTooltip()
     -- Earlier versions could leave the minimum name size raised.
     if mod.db.savedSize ~= nil then
@@ -660,7 +803,8 @@ function mod.BuildOptions(parent, y)
 
     -- Name at the cursor
     ns.CreateSection(parent, L.nm_secName, y)
-    y = y - 32
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.nm_nameNote, y) - 12
     add(ns.CreateCheck(parent, L.nm_cursorName, y,
         function() return db().cursorName end, set("cursorName"),
         { tooltip = L.nm_cursorName_tip }))
@@ -731,8 +875,7 @@ function mod.BuildOptions(parent, y)
     -- Names above heads
     ns.CreateSection(parent, L.nm_secWorld, y)
     y = y - 30
-    ns.CreateNote(parent, L.nm_worldNote, y)
-    y = y - 34
+    y = y - ns.CreateNote(parent, L.nm_worldNote, y) - 14
     local notHidden = function() return not NamesHidden() end
     local shown = {}
     for _, option in ipairs(WORLD_NAMES) do
@@ -749,15 +892,17 @@ function mod.BuildOptions(parent, y)
               enabledIf = notHidden }))
         if col == 1 or i == #shown then y = y - 28 end
     end
-    y = y - 8
+    y = y - 12
+
+    -- Quick toggle
+    ns.CreateSection(parent, L.nm_secQuick, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.nm_quickNote, y) - 14
     local toggleButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     toggleButton:SetSize(220, 24)
     toggleButton:SetPoint("TOPLEFT", 20, y)
-    toggleButton:SetScript("OnClick", function()
-        ToggleWorldNames()
-        refreshAll()
-    end)
-    y = y - 32
+    toggleButton:SetScript("OnClick", function() ToggleAll() end)
+    y = y - 30
     local stateNote = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     stateNote:SetPoint("TOPLEFT", 18, y)
     stateNote:SetWidth(380)
@@ -771,11 +916,40 @@ function mod.BuildOptions(parent, y)
             stateNote:SetText(L.nm_toggleNote)
         end
     end)
-    y = y - 40
+    y = y - 34
+
+    add(ns.CreateCheck(parent, L.nm_showButton, y,
+        function() return db().showButton end, set("showButton"),
+        { tooltip = L.nm_showButton_tip }))
+    y = y - 34
+    add(ns.CreateDropdown(parent, L.nm_buttonMode, y, { "shown", "hover" },
+        function() return db().buttonMode end, set("buttonMode")))
+    y = y - 32
+    add(ns.CreateStepper(parent, L.nm_buttonIdle, y,
+        function() return db().buttonIdleAlpha end, set("buttonIdleAlpha"), 0, 90, 10, "%",
+        { tooltip = L.nm_buttonIdle_tip }))
+    y = y - 32
+    add(ns.CreateSlider(parent, L.nm_buttonSize, y,
+        function() return db().buttonSize end,
+        function(v) db().buttonSize = v; ApplyToggleLayout() end, 20, 64,
+        function(v) return tostring(math.floor(v + 0.5)) end))
+    y = y - 34
+    local reset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    reset:SetSize(160, 22)
+    reset:SetPoint("TOPLEFT", 20, y)
+    reset:SetText(L.nm_resetPos)
+    reset:SetScript("OnClick", function()
+        db().buttonPoint = nil
+        ApplyToggleLayout()
+    end)
+    y = y - 28
+    ns.CreateNote(parent, L.nm_moveNote, y)
+    y = y - 34
 
     -- Tooltip
     ns.CreateSection(parent, L.nm_secTooltip, y)
-    y = y - 32
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.nm_tooltipSecNote, y) - 12
     add(ns.CreateCheck(parent, L.nm_tooltipCursor, y,
         function() return db().tooltipCursor end, set("tooltipCursor"),
         { tooltip = L.nm_tooltipCursor_tip }))
@@ -793,12 +967,13 @@ function mod.BuildOptions(parent, y)
 
     ns.CreateNote(parent, L.nm_note, y)
 
+    optionRefreshers[#optionRefreshers + 1] = refreshAll
     return refreshAll
 end
 
 function mod.Command(cmd)
     if cmd == "togglenames" then
-        if ToggleWorldNames() then
+        if ToggleAll() then
             ns.Print(L.nm_toggledOn)
         else
             ns.Print(L.nm_toggledOff)
