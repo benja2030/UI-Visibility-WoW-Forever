@@ -268,6 +268,50 @@ function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format)
     return ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, 1, "")
 end
 
+-- A label with a dropdown menu to pick one of a list of values. "values" are
+-- keys translated with L. Uses the game's current dropdown
+-- (WowStyle1DropdownTemplate), or the older UIDropDownMenu if this client
+-- doesn't have it.
+local optionDropdownCount = 0
+
+function ns.CreateDropdown(parent, label, y, values, getter, setter)
+    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    text:SetPoint("TOPLEFT", 18, y)
+    text:SetText(label)
+
+    local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    if ok and dropdown and dropdown.SetupMenu then
+        dropdown:SetWidth(170)
+        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        dropdown:SetupMenu(function(_, root)
+            for _, value in ipairs(values) do
+                root:CreateRadio(L[value],
+                    function() return getter() == value end,
+                    function() setter(value) end)
+            end
+        end)
+        return function() dropdown:GenerateMenu() end
+    end
+
+    optionDropdownCount = optionDropdownCount + 1
+    local legacy = CreateFrame("Frame", "UIVisibilityOptionDropdown" .. optionDropdownCount, parent, "UIDropDownMenuTemplate")
+    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    UIDropDownMenu_SetWidth(legacy, 160)
+    UIDropDownMenu_Initialize(legacy, function()
+        for _, value in ipairs(values) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = L[value]
+            info.checked = getter() == value
+            info.func = function()
+                setter(value)
+                UIDropDownMenu_SetText(legacy, L[value])
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    return function() UIDropDownMenu_SetText(legacy, L[getter()]) end
+end
+
 -- A label with a button that cycles through a list of values.
 function ns.CreateCycle(parent, label, y, values, getter, setter)
     local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -566,7 +610,7 @@ local function CreateWindow()
     end
     local rows = math.ceil(#keys / TABS_PER_ROW)
     paneTop = -36 - rows * 28
-    window:SetHeight(500 + rows * 28)
+    window:SetHeight(590 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)

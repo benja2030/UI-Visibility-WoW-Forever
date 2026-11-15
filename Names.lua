@@ -10,6 +10,10 @@
 --   * Tooltip at the cursor: the tooltip shows up next to the cursor instead
 --     of in the corner, optionally bigger.
 --
+-- The game's own name above the head can't be hidden for one character only
+-- (only for every player or every NPC at once), so both names show while you
+-- hover.
+--
 -- Performance: the name follows the cursor with its own OnUpdate, which only
 -- runs while the name is on screen.
 
@@ -32,6 +36,9 @@ ns.AddLocale("en", {
     nm_npcs = "NPCs",
     nm_enemies = "Enemies",
     nm_worldOnly = "Only when hovering characters in the world",
+    nm_delay = "Delay before showing",
+    nm_hideCombat = "Don't show it in combat",
+    nm_hideInstances = "Don't show it in dungeons, raids and battlegrounds",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Show the tooltip next to the cursor",
     nm_tooltipScale = "Tooltip size",
@@ -53,6 +60,9 @@ ns.AddLocale("es", {
     nm_npcs = "PNJ",
     nm_enemies = "Enemigos",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
+    nm_delay = "Espera antes de mostrarlo",
+    nm_hideCombat = "No mostrarlo en combate",
+    nm_hideInstances = "No mostrarlo en mazmorras, bandas y campos de batalla",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Mostrar el tooltip junto al cursor",
     nm_tooltipScale = "Tamaño del tooltip",
@@ -74,6 +84,9 @@ local mod = {
         npcs = true,
         enemies = true,
         worldOnly = true,
+        delay = 0,          -- tenths of a second before the name shows
+        hideCombat = false,
+        hideInstances = false,
         tooltipCursor = false,
         tooltipScale = 100,
     },
@@ -114,6 +127,11 @@ local function WantsHovered()
     if not Yes(UnitExists("mouseover")) then return false end
     if Yes(UnitIsUnit("mouseover", "player")) then return false end
     if db.worldOnly and not MouseOverWorld() then return false end
+    if db.hideCombat and (InCombatLockdown() or Yes(UnitAffectingCombat("player"))) then return false end
+    if db.hideInstances then
+        local inInstance, kind = IsInInstance()
+        if inInstance and kind ~= "none" then return false end
+    end
     if db.skipPlates and HasNameplate() then return false end
     if not db.enemies then
         local canAttack = UnitCanAttack("player", "mouseover")
@@ -167,6 +185,7 @@ end)
 
 local showing = false
 local hoverUntil = 0
+local hoverStart -- when the mouse started hovering a character
 local hoveredName = ""
 
 -- Name and color the game uses for the hovered character.
@@ -183,6 +202,11 @@ local function SetFromMouseover()
     if not ok or ns.IsSecret(r) or ns.IsSecret(g) or ns.IsSecret(b) or not r then
         r, g, b = 1, 0.82, 0
     end
+    -- Friendly players come back as pure blue, but the game draws their
+    -- names in a lighter blue (measured in game: 102, 102, 255).
+    if r < 0.05 and g < 0.05 and b > 0.95 then
+        r, g, b = 0.4, 0.4, 1
+    end
     text:SetTextColor(r, g, b)
 end
 
@@ -192,6 +216,8 @@ function mod.OnTick(now)
     local db = mod.db
     local want = db.enabled and db.cursorName and WantsHovered()
     if want then
+        hoverStart = hoverStart or now
+        if not showing and now - hoverStart < db.delay / 10 then return end
         hoverUntil = now + LINGER
         local guid = UnitGUID("mouseover")
         if ns.IsSecret(guid) then guid = nil end
@@ -203,9 +229,12 @@ function mod.OnTick(now)
             showing = true
             label:Show()
         end
-    elseif showing and now >= hoverUntil then
-        showing = false
-        lastGUID = nil
+    else
+        hoverStart = nil
+        if showing and now >= hoverUntil then
+            showing = false
+            lastGUID = nil
+        end
     end
 
     -- Fade in and out with the addon's fade smoothness.
@@ -278,10 +307,14 @@ function mod.BuildOptions(parent, y)
         function(v) mod.db.size = v; ApplyFont() end, 10, 40,
         function(v) return tostring(math.floor(v + 0.5)) end))
     y = y - 32
-    add(ns.CreateCycle(parent, L.nm_position, y, POSITIONS,
+    add(ns.CreateDropdown(parent, L.nm_position, y, POSITIONS,
         function() return mod.db.position end,
         function(v) mod.db.position = v; PlaceText() end))
     y = y - 32
+    add(ns.CreateStepper(parent, L.nm_delay, y,
+        function() return mod.db.delay end, set("delay"), 0, 10, 1,
+        function(v) return string.format("%.1f s", v / 10) end))
+    y = y - 30
     add(ns.CreateCheck(parent, L.nm_skipPlates, y,
         function() return mod.db.skipPlates end, set("skipPlates")))
     y = y - 34
@@ -295,6 +328,12 @@ function mod.BuildOptions(parent, y)
     end
     add(ns.CreateCheck(parent, L.nm_worldOnly, y,
         function() return mod.db.worldOnly end, set("worldOnly")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_hideCombat, y,
+        function() return mod.db.hideCombat end, set("hideCombat")))
+    y = y - 28
+    add(ns.CreateCheck(parent, L.nm_hideInstances, y,
+        function() return mod.db.hideInstances end, set("hideInstances")))
     y = y - 38
 
     ns.CreateHeader(parent, L.nm_tooltipHeader, y)
