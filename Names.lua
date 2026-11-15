@@ -108,6 +108,9 @@ ns.AddLocale("en", {
     nm_showButton = "Button on screen",
     nm_showButton_tip = "Shows a small button that hides or shows all names above heads with one click.",
     nm_buttonMode = "Button mode",
+    nm_buttonStyle = "Button icon",
+    style_eye = "Simple eye",
+    style_spell = "Game icon",
     nm_buttonIdle = "Opacity away",
     nm_buttonIdle_tip = "In On hover mode, the button's opacity while the mouse isn't over it. 0% makes it invisible until you hover where it is.",
     nm_buttonSize = "Button size",
@@ -206,6 +209,9 @@ ns.AddLocale("es", {
     nm_showButton = "Botón en pantalla",
     nm_showButton_tip = "Muestra un botón pequeño que oculta o muestra todos los nombres sobre la cabeza con un clic.",
     nm_buttonMode = "Modo del botón",
+    nm_buttonStyle = "Ícono del botón",
+    style_eye = "Ojo simple",
+    style_spell = "Ícono del juego",
     nm_buttonIdle = "Opacidad sin mouse",
     nm_buttonIdle_tip = "En modo Con el mouse, la opacidad del botón mientras el mouse no está encima. 0% lo vuelve invisible hasta que pasas el mouse por donde está.",
     nm_buttonSize = "Tamaño del botón",
@@ -252,6 +258,7 @@ local mod = {
         tooltipDelay = 0,
         showButton = false,
         buttonMode = "shown",   -- "shown" or "hover"
+        buttonStyle = "style_eye", -- "style_eye" (drawn eye) or "style_spell" (game icon)
         buttonIdleAlpha = 30,   -- % while not hovered, in "hover" mode
         buttonSize = 32,
         buttonPoint = nil,      -- saved position   -- tenths of a second before world tooltips show
@@ -666,27 +673,69 @@ toggle:RegisterForClicks("LeftButtonUp")
 toggle:SetAlpha(0)
 toggle:Hide()
 
+-- A plain, gray look so the button doesn't stand out on screen.
 local toggleBorder = toggle:CreateTexture(nil, "BACKGROUND")
 toggleBorder:SetPoint("TOPLEFT", -1, 1)
 toggleBorder:SetPoint("BOTTOMRIGHT", 1, -1)
-toggleBorder:SetColorTexture(0, 0, 0, 0.8)
+toggleBorder:SetColorTexture(0, 0, 0, 0.5)
 
 local toggleIcon = toggle:CreateTexture(nil, "ARTWORK")
 toggleIcon:SetAllPoints()
 toggleIcon:SetTexture("Interface\\Icons\\Spell_Holy_MindVision")
 toggleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+toggleIcon:SetDesaturated(true)
 
 local toggleCross = toggle:CreateTexture(nil, "OVERLAY")
 toggleCross:SetPoint("CENTER")
 toggleCross:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+toggleCross:SetDesaturated(true)
+toggleCross:SetVertexColor(0.85, 0.85, 0.85)
 
 toggle:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 
--- Gray icon with a red cross while names are hidden.
+-- Two looks, both gray so the button doesn't stand out:
+--   style_eye:   a plain drawn eye, open while names are shown and crossed
+--                out while they're hidden (Media\EyeOpen and EyeClosed).
+--   style_spell: the game's Mind Vision icon in gray, darker and with a
+--                cross while names are hidden.
+local MEDIA = "Interface\\AddOns\\UIVisibility\\Media\\"
+local SPELL_ICON = "Interface\\Icons\\Spell_Holy_MindVision"
+
 local function UpdateToggleLook()
-    local hidden = mod.db and mod.db.worldNamesSaved ~= nil
-    toggleIcon:SetDesaturated(hidden)
-    toggleCross:SetShown(hidden)
+    local db = mod.db
+    local hidden = db and db.worldNamesSaved ~= nil
+    local highlight = toggle:GetHighlightTexture()
+    if db and db.buttonStyle == "style_spell" then
+        toggleBorder:Show()
+        toggleIcon:SetTexture(SPELL_ICON)
+        toggleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        toggleIcon:SetDesaturated(true)
+        if hidden then
+            toggleIcon:SetVertexColor(0.4, 0.4, 0.4)
+        else
+            toggleIcon:SetVertexColor(0.85, 0.85, 0.85)
+        end
+        toggleCross:SetShown(hidden)
+        highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+        highlight:SetTexCoord(0, 1, 0, 1)
+        highlight:SetAlpha(1)
+    else
+        local texture = MEDIA .. (hidden and "EyeClosed" or "EyeOpen")
+        toggleBorder:Hide()
+        toggleIcon:SetTexture(texture)
+        toggleIcon:SetTexCoord(0, 1, 0, 1)
+        toggleIcon:SetDesaturated(false)
+        if hidden then
+            toggleIcon:SetVertexColor(0.5, 0.5, 0.5)
+        else
+            toggleIcon:SetVertexColor(0.8, 0.8, 0.8)
+        end
+        toggleCross:Hide()
+        -- On hover, the eye itself lights up instead of a square glow.
+        highlight:SetTexture(texture)
+        highlight:SetTexCoord(0, 1, 0, 1)
+        highlight:SetAlpha(0.35)
+    end
 end
 
 local function ShowToggleTooltip(self)
@@ -922,6 +971,10 @@ function mod.BuildOptions(parent, y)
         function() return db().showButton end, set("showButton"),
         { tooltip = L.nm_showButton_tip }))
     y = y - 34
+    add(ns.CreateDropdown(parent, L.nm_buttonStyle, y, { "style_eye", "style_spell" },
+        function() return db().buttonStyle end,
+        function(v) db().buttonStyle = v; UpdateToggleLook(); refreshAll() end))
+    y = y - 32
     add(ns.CreateDropdown(parent, L.nm_buttonMode, y, { "shown", "hover" },
         function() return db().buttonMode end, set("buttonMode")))
     y = y - 32
