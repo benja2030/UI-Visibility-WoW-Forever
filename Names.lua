@@ -36,13 +36,13 @@ ns.AddLocale("en", {
     nm_npcs = "NPCs",
     nm_enemies = "Enemies",
     nm_worldOnly = "Only when hovering characters in the world",
-    nm_delay = "Delay before showing (name and tooltip)",
+    nm_delay = "Show delay",
     nm_hideCombat = "Don't show it in combat",
     nm_hideInstances = "Don't show it in dungeons, raids and battlegrounds",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Show the tooltip next to the cursor",
     nm_tooltipScale = "Tooltip size",
-    nm_note = "The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor, which is on top of the character you hover.",
+    nm_note = "The show delay applies to both the name and the tooltip of characters and objects in the world. The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor.",
     nm_st_disabled = "module disabled",
     nm_st_showing = "showing %s at the cursor",
     nm_st_idle = "waiting for the mouse",
@@ -60,13 +60,13 @@ ns.AddLocale("es", {
     nm_npcs = "PNJ",
     nm_enemies = "Enemigos",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
-    nm_delay = "Espera antes de mostrar (nombre y tooltip)",
+    nm_delay = "Retraso",
     nm_hideCombat = "No mostrarlo en combate",
     nm_hideInstances = "No mostrarlo en mazmorras, bandas y campos de batalla",
     nm_tooltipHeader = "Tooltip:",
     nm_tooltipCursor = "Mostrar el tooltip junto al cursor",
     nm_tooltipScale = "Tamaño del tooltip",
-    nm_note = "El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor, que está sobre el personaje que apuntas.",
+    nm_note = "El retraso se aplica al nombre y al tooltip de personajes y objetos del mundo. El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor.",
     nm_st_disabled = "módulo desactivado",
     nm_st_showing = "mostrando a %s junto al cursor",
     nm_st_idle = "esperando el mouse",
@@ -253,32 +253,36 @@ end
 -- the corner (world objects, characters and many buttons). Right after it,
 -- the tooltip is moved next to the cursor and scaled.
 --
--- Delay: tooltips for things in the world (anchored to UIParent or the
--- world) start invisible and appear after the same delay as the name.
--- Tooltips of buttons and windows are never delayed.
+-- Delay: when the tooltip opens while the mouse is over the world (a
+-- character, NPC or object), it stays invisible for the same delay as the
+-- name. Tooltips of buttons and windows are never delayed. The tooltip is
+-- kept invisible every frame, because the game sets its opacity itself.
 local tooltipHooked = false
 local tooltipPendingUntil -- time the delayed tooltip becomes visible
 
-local function DelayTooltip(tooltip, parent)
+local function DelayTooltip(tooltip)
     local db = mod.db
-    if db.delay <= 0 then return end
-    if parent ~= UIParent and parent ~= WorldFrame then return end
+    if not (db and db.enabled) or db.delay <= 0 then return end
+    if not MouseOverWorld() then return end
     tooltipPendingUntil = GetTime() + db.delay / 10
     tooltip:SetAlpha(0)
 end
 
--- Called every tick: keeps a delayed tooltip hidden until its time comes.
-function UpdateTooltipDelay(now)
+-- Called every frame while the tooltip is shown.
+local function HoldTooltip(tooltip)
     if not tooltipPendingUntil then return end
-    if not GameTooltip:IsShown() then
+    if GetTime() >= tooltipPendingUntil then
         tooltipPendingUntil = nil
-        return
+        tooltip:SetAlpha(1)
+    elseif tooltip:GetAlpha() > 0 then
+        tooltip:SetAlpha(0)
     end
-    if now >= tooltipPendingUntil then
+end
+
+-- Called every tick, in case the tooltip hid without its OnHide running.
+function UpdateTooltipDelay()
+    if tooltipPendingUntil and not GameTooltip:IsShown() then
         tooltipPendingUntil = nil
-        GameTooltip:SetAlpha(1)
-    elseif GameTooltip:GetAlpha() > 0 then
-        GameTooltip:SetAlpha(0) -- the game showed it again
     end
 end
 
@@ -295,8 +299,9 @@ local function HookTooltip()
         if db.tooltipScale ~= 100 then
             tooltip:SetScale(db.tooltipScale / 100)
         end
-        DelayTooltip(tooltip, parent)
     end)
+    GameTooltip:HookScript("OnShow", DelayTooltip)
+    GameTooltip:HookScript("OnUpdate", HoldTooltip)
     -- Other tooltips (items, spells) keep their normal size.
     GameTooltip:HookScript("OnHide", function(self)
         if self:GetScale() ~= 1 then self:SetScale(1) end

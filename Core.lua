@@ -210,7 +210,7 @@ function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, su
     text:SetText(label)
 
     local value = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    value:SetPoint("TOPLEFT", 220, y)
+    value:SetPoint("TOPLEFT", 250, y)
     value:SetJustifyH("CENTER")
     value:SetWidth(44)
 
