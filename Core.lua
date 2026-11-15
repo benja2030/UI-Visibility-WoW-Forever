@@ -48,6 +48,8 @@ ns.AddLocale("en", {
     help = "Help",
     tab_general = "General",
     generalTitle = "General Options",
+    page_bars = "Bars",
+    page_frames = "Frames",
     sec_modules = "Modules",
     sec_appearance = "Appearance",
     sec_language = "Language and help",
@@ -83,6 +85,8 @@ ns.AddLocale("es", {
     help = "Ayuda",
     tab_general = "General",
     generalTitle = "Opciones generales",
+    page_bars = "Barras",
+    page_frames = "Marcos",
     sec_modules = "Módulos",
     sec_appearance = "Apariencia",
     sec_language = "Idioma y ayuda",
@@ -284,6 +288,27 @@ function ns.CreatePageHeader(parent, pageName)
     local ok = pcall(line.SetGradient, line, "HORIZONTAL",
         CreateColor(1, 0.82, 0, 0.9), CreateColor(1, 0.82, 0, 0))
     if not ok then line:SetColorTexture(1, 0.82, 0, 0.5) end
+end
+
+-- Title of a module inside a page that holds several modules: bigger than a
+-- section title, over a dark band with a gold mark on the left. Takes 40
+-- pixels.
+function ns.CreateModuleTitle(parent, text, y)
+    local band = parent:CreateTexture(nil, "BACKGROUND")
+    band:SetPoint("TOPLEFT", 8, y)
+    band:SetPoint("RIGHT", parent, "RIGHT", -8, 0)
+    band:SetHeight(32)
+    band:SetColorTexture(0, 0, 0, 0.35)
+
+    local mark = parent:CreateTexture(nil, "ARTWORK")
+    mark:SetPoint("TOPLEFT", band, "TOPLEFT", 0, 0)
+    mark:SetPoint("BOTTOMLEFT", band, "BOTTOMLEFT", 0, 0)
+    mark:SetWidth(3)
+    mark:SetColorTexture(1, 0.82, 0, 0.9)
+
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    fs:SetPoint("LEFT", band, "LEFT", 12, 0)
+    fs:SetText(text)
 end
 
 -- A section title with a thin line under it. Takes about 30 pixels.
@@ -697,7 +722,84 @@ local function BuildGeneral(parent, y, openModule)
 end
 
 ---------------------------------------------------------------------------
--- Floating options window with one tab per module (/uiv)
+-- Pages
+---------------------------------------------------------------------------
+-- Modules are grouped into pages by where they are on screen. A page with
+-- several modules shows them one under the other, each with its own title
+-- and Enabled checkbox. The modules themselves stay separate, so their
+-- settings and commands don't change. A module not listed here gets a page
+-- of its own.
+local PAGE_LAYOUT = {
+    { key = "pg_bars",      titleKey = "page_bars",   modules = { "actionbars", "bars", "xp" } },
+    { key = "pg_frames",    titleKey = "page_frames", modules = { "unitframes", "prd" } },
+    { key = "pg_interface", modules = { "interface" } },
+    { key = "pg_minimap",   modules = { "minimap" } },
+    { key = "pg_names",     modules = { "names" } },
+}
+
+local pages, pageByKey, pageOfModule
+
+local function GetPages()
+    if pages then return pages end
+    pages, pageByKey, pageOfModule = {}, {}, {}
+    local used = {}
+    local function addPage(page)
+        local mods = {}
+        for _, key in ipairs(page.modules) do
+            local mod = ns.moduleByKey[key]
+            if mod then mods[#mods + 1] = mod; used[key] = true end
+        end
+        if #mods == 0 then return end
+        local entry = { key = page.key, mods = mods }
+        if page.titleKey and #mods > 1 then
+            entry.title, entry.tab = L[page.titleKey], L[page.titleKey]
+        else
+            entry.title, entry.tab = L[mods[1].titleKey], L[mods[1].tabKey]
+        end
+        pages[#pages + 1] = entry
+        pageByKey[entry.key] = entry
+        for _, mod in ipairs(mods) do pageOfModule[mod.key] = entry end
+    end
+    for _, page in ipairs(PAGE_LAYOUT) do addPage(page) end
+    for _, mod in ipairs(ns.moduleList) do
+        if not used[mod.key] then addPage({ key = "pg_" .. mod.key, modules = { mod.key } }) end
+    end
+    return pages
+end
+
+-- Turns a module key or a page key into a page key ("general" stays).
+local function PageKeyFor(key)
+    GetPages()
+    if key == "general" or pageByKey[key] then return key end
+    if pageOfModule[key] then return pageOfModule[key].key end
+    return "general"
+end
+
+-- Builds a page's options into "parent". Returns a refresh function.
+local function BuildPage(page, parent, y)
+    if #page.mods == 1 then
+        return page.mods[1].BuildOptions(parent, y)
+    end
+    local refreshers, blocks = {}, {}
+    for i, mod in ipairs(page.mods) do
+        local block = CreateFrame("Frame", nil, parent)
+        block:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
+        block:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+        block:SetHeight(1)
+        ns.CreateModuleTitle(block, L[mod.titleKey], -2)
+        refreshers[#refreshers + 1] = mod.BuildOptions(block, -46)
+        FitContent(block)
+        y = y - block:GetHeight() - 20
+        blocks[i] = block
+    end
+    return function()
+        for _, r in ipairs(refreshers) do r() end
+        for _, block in ipairs(blocks) do FitContent(block) end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Floating options window with one tab per page (/uiv)
 ---------------------------------------------------------------------------
 local window
 local tabs, panes, paneRefresh = {}, {}, {}
@@ -707,15 +809,15 @@ local paneTop = -92 -- set in CreateWindow from the number of tab rows
 
 local SelectTab
 
-local function BuildPane(key, pane)
+local function BuildPane(key, parent)
     if key == "general" then
-        return BuildGeneral(pane, -4, function(mod) SelectTab(mod.key) end)
+        return BuildGeneral(parent, -4, function(mod) SelectTab(mod.key) end)
     end
-    return ns.moduleByKey[key].BuildOptions(pane, -4)
+    return BuildPage(pageByKey[key], parent, -4)
 end
 
 function SelectTab(key)
-    if key ~= "general" and not ns.moduleByKey[key] then key = "general" end
+    key = PageKeyFor(key)
     ns.db.lastTab = key
     for k, button in pairs(tabs) do
         if k == key then button:LockHighlight() else button:UnlockHighlight() end
@@ -725,7 +827,7 @@ function SelectTab(key)
         local pane = CreateFrame("Frame", nil, window)
         pane:SetPoint("TOPLEFT", 0, paneTop)
         pane:SetPoint("BOTTOMRIGHT", 0, 8)
-        local pageName = key == "general" and L.generalTitle or L[ns.moduleByKey[key].titleKey]
+        local pageName = key == "general" and L.generalTitle or pageByKey[key].title
         ns.CreatePageHeader(pane, pageName)
         local content = CreateScrollArea(pane, -46)
         local refresh = BuildPane(key, content)
@@ -758,14 +860,14 @@ local function CreateWindow()
     icon:SetPoint("RIGHT", title, "LEFT", -4, 0)
     icon:SetTexture(ns.ICON)
 
-    -- Tabs: General first, then one per module, in rows of four.
+    -- Tabs: General first, then one per page, in rows of four.
     local keys = { { key = "general", label = L.tab_general } }
-    for _, mod in ipairs(ns.moduleList) do
-        keys[#keys + 1] = { key = mod.key, label = L[mod.tabKey] }
+    for _, page in ipairs(GetPages()) do
+        keys[#keys + 1] = { key = page.key, label = page.tab }
     end
     local rows = math.ceil(#keys / TABS_PER_ROW)
     paneTop = -36 - rows * 28
-    window:SetHeight(560 + rows * 28)
+    window:SetHeight(580 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)
@@ -779,6 +881,7 @@ local function CreateWindow()
     end
 end
 
+-- Opens the window on a page. "key" can be a page, a module or "general".
 function ns.OpenWindow(key)
     if not window then CreateWindow() end
     window:Show()
@@ -809,25 +912,27 @@ local function RegisterSettings()
 
     ns.settingsCategory = Settings.RegisterCanvasLayoutCategory(main, "UI Visibility")
 
-    -- One sub-page per module.
+    -- One sub-page per page of the window.
+    local categoryOfPage = {}
     if Settings.RegisterCanvasLayoutSubcategory then
-        for _, mod in ipairs(ns.moduleList) do
+        for _, entry in ipairs(GetPages()) do
             local page = CreateFrame("Frame")
             page:Hide()
-            ns.CreatePageHeader(page, L[mod.titleKey])
+            ns.CreatePageHeader(page, entry.title)
             local content = CreateScrollArea(page, -46)
-            local refresh = mod.BuildOptions(content, -8)
+            local refresh = BuildPage(entry, content, -8)
             page:SetScript("OnShow", function() refresh(); FitContent(content) end)
-            mod.settingsCategory = Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, L[mod.titleKey])
+            categoryOfPage[entry.key] = Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, entry.title)
         end
     end
 
-    -- "Open" goes to the module's sub-page, or to its tab in the window if
+    -- "Open" goes to the module's page, or to its tab in the window if
     -- sub-pages aren't available.
     local mainContent = CreateScrollArea(main, -46)
     local mainRefresh = BuildGeneral(mainContent, -8, function(mod)
-        if mod.settingsCategory and Settings.OpenToCategory then
-            local ok = pcall(Settings.OpenToCategory, mod.settingsCategory:GetID())
+        local category = categoryOfPage[PageKeyFor(mod.key)]
+        if category and Settings.OpenToCategory then
+            local ok = pcall(Settings.OpenToCategory, category:GetID())
             if ok then return end
         end
         ns.OpenWindow(mod.key)
