@@ -63,7 +63,7 @@ ns.AddLocale("en", {
         .. "5. Save the file and restart the game.",
     helpCopy = "Click the box and press Ctrl+C to copy the command.",
     helpFooter = "If the addon doesn't load you can't open this window, so these steps are also in README.txt inside the addon folder.",
-    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv options, /uiv help, /uiv status",
+    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv options, /uiv help, /uiv status",
 })
 ns.AddLocale("es", {
     loaded = "activo. Escribe /uiv para abrir las opciones.",
@@ -94,7 +94,7 @@ ns.AddLocale("es", {
         .. "5. Guarda el archivo y reinicia el juego.",
     helpCopy = "Haz clic en el recuadro y presiona Ctrl+C para copiar el comando.",
     helpFooter = "Si el addon no carga no podrás abrir esta ventana, así que estos pasos también están en README.txt dentro de la carpeta del addon.",
-    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv opciones, /uiv ayuda, /uiv estado",
+    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv opciones, /uiv ayuda, /uiv estado",
 })
 
 function ns.Print(msg) print(ns.PREFIX .. msg) end
@@ -509,6 +509,7 @@ local window
 local tabs, panes, paneRefresh = {}, {}, {}
 local WINDOW_WIDTH = 460
 local TABS_PER_ROW = 4
+local paneTop = -92 -- set in CreateWindow from the number of tab rows
 
 local SelectTab
 
@@ -528,7 +529,7 @@ function SelectTab(key)
     for k, pane in pairs(panes) do pane:SetShown(k == key) end
     if not panes[key] then
         local pane = CreateFrame("Frame", nil, window)
-        pane:SetPoint("TOPLEFT", 0, -92)
+        pane:SetPoint("TOPLEFT", 0, paneTop)
         pane:SetPoint("BOTTOMRIGHT", 0, 12)
         paneRefresh[key] = BuildPane(key, pane)
         pane:SetScript("OnShow", function() paneRefresh[key]() end)
@@ -563,6 +564,9 @@ local function CreateWindow()
     for _, mod in ipairs(ns.moduleList) do
         keys[#keys + 1] = { key = mod.key, label = L[mod.tabKey] }
     end
+    local rows = math.ceil(#keys / TABS_PER_ROW)
+    paneTop = -36 - rows * 28
+    window:SetHeight(500 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)
@@ -719,6 +723,7 @@ local TAB_ALIASES = {
     actionbars = "actionbars", ab = "actionbars",
     unitframes = "unitframes", frames = "unitframes", uf = "unitframes",
     interface = "interface", interfaz = "interface",
+    names = "names", nombres = "names",
     general = "general",
 }
 
