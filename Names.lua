@@ -13,6 +13,10 @@
 --   * Tooltip at the cursor: the tooltip shows up next to the cursor instead
 --     of in the corner, optionally bigger.
 --
+-- It also offers the game's own settings for the names above heads, by
+-- category (players, NPCs, pets, critters...), and a way to hide them all and
+-- bring them back exactly as they were (/uiv togglenames).
+--
 -- The game's own name above the head can't be hidden for one character only
 -- (only for every player or every NPC at once), so both names show while you
 -- hover.
@@ -64,6 +68,39 @@ ns.AddLocale("en", {
     nm_worldOnly = "Over the interface",
     nm_worldOnly_tip = "The mouse is over an interface frame (like the party or target frame) instead of the world.",
 
+    nm_secWorld = "Names above heads",
+    nm_worldNote = "These are the game's own settings, so they also change in the game's options. Hover each one for details.",
+    nm_wAlliedPlayers = "Allied players",
+    nm_wEnemyPlayers = "Enemy players",
+    nm_wHostileNpcs = "Hostile NPCs",
+    nm_wHostileNpcs_tip = "Monsters and other NPCs you can attack.",
+    nm_wInteractiveNpcs = "Interactive NPCs",
+    nm_wInteractiveNpcs_tip = "Vendors, quest givers and other NPCs you can talk to.",
+    nm_wSpecialNpcs = "Special NPCs",
+    nm_wSpecialNpcs_tip = "Special friendly NPCs the game always labels.",
+    nm_wAllNpcs = "All NPCs",
+    nm_wAllNpcs_tip = "Every NPC, including corpses. Off by default in the game; with it off, the NPC categories above still show.",
+    nm_wPets = "Pets",
+    nm_wPets_tip = "Pets of allies and enemies.",
+    nm_wMinions = "Guardians and minions",
+    nm_wMinions_tip = "Summoned guardians and minions of allies and enemies.",
+    nm_wTotems = "Totems",
+    nm_wTotems_tip = "Totems of allies and enemies.",
+    nm_wCritters = "Critters",
+    nm_wCritters_tip = "Non-combat creatures, like rabbits and squirrels.",
+    nm_wOwn = "Your own name",
+    nm_wWeak = "Weak enemies",
+    nm_wWeak_tip = "The weakest enemies of big groups. Off hides their names even when hostile NPC names are on.",
+    nm_wGuild = "Guild names",
+    nm_wGuild_tip = "The guild name under each player's name.",
+    nm_wTitles = "Titles",
+    nm_wTitles_tip = "Titles shown with players' names.",
+    nm_hideAll = "Hide all names",
+    nm_showAgain = "Show names again",
+    nm_hiddenNote = "Names are hidden. Show them again to change these settings.",
+    nm_toggleNote = "Tip: /uiv togglenames does the same in a macro.",
+    nm_toggledOff = "names above heads hidden. Use /uiv togglenames to bring them back.",
+    nm_toggledOn = "names above heads shown again.",
     nm_secTooltip = "Tooltip",
     nm_tooltipCursor = "Next to the cursor",
     nm_tooltipCursor_tip = "Shows the tooltip next to the cursor instead of in the corner of the screen.",
@@ -114,6 +151,39 @@ ns.AddLocale("es", {
     nm_worldOnly = "Sobre la interfaz",
     nm_worldOnly_tip = "El mouse está sobre un marco de la interfaz (como el del grupo o el del objetivo) en vez del mundo.",
 
+    nm_secWorld = "Nombres sobre la cabeza",
+    nm_worldNote = "Son ajustes del propio juego, así que también cambian en las opciones del juego. Pasa el mouse sobre cada uno para ver el detalle.",
+    nm_wAlliedPlayers = "Jugadores aliados",
+    nm_wEnemyPlayers = "Jugadores enemigos",
+    nm_wHostileNpcs = "PNJ hostiles",
+    nm_wHostileNpcs_tip = "Monstruos y otros PNJ que puedes atacar.",
+    nm_wInteractiveNpcs = "PNJ interactivos",
+    nm_wInteractiveNpcs_tip = "Vendedores, PNJ de misiones y otros PNJ con los que puedes hablar.",
+    nm_wSpecialNpcs = "PNJ especiales",
+    nm_wSpecialNpcs_tip = "PNJ amistosos especiales que el juego siempre etiqueta.",
+    nm_wAllNpcs = "Todos los PNJ",
+    nm_wAllNpcs_tip = "Todos los PNJ, incluidos los cadáveres. Viene desactivado en el juego; aun así, las categorías de PNJ de arriba se siguen mostrando.",
+    nm_wPets = "Mascotas",
+    nm_wPets_tip = "Mascotas de aliados y enemigos.",
+    nm_wMinions = "Guardianes y esbirros",
+    nm_wMinions_tip = "Guardianes y esbirros invocados por aliados y enemigos.",
+    nm_wTotems = "Tótems",
+    nm_wTotems_tip = "Tótems de aliados y enemigos.",
+    nm_wCritters = "Criaturas",
+    nm_wCritters_tip = "Criaturas no combatientes, como conejos y ardillas.",
+    nm_wOwn = "Tu propio nombre",
+    nm_wWeak = "Enemigos menores",
+    nm_wWeak_tip = "Los enemigos más débiles de los grupos grandes. Desactivado oculta sus nombres aunque los de PNJ hostiles estén activados.",
+    nm_wGuild = "Hermandad",
+    nm_wGuild_tip = "El nombre de la hermandad bajo el nombre de cada jugador.",
+    nm_wTitles = "Títulos",
+    nm_wTitles_tip = "Los títulos que se muestran con el nombre de los jugadores.",
+    nm_hideAll = "Ocultar todos los nombres",
+    nm_showAgain = "Mostrar los nombres otra vez",
+    nm_hiddenNote = "Los nombres están ocultos. Muéstralos otra vez para cambiar estos ajustes.",
+    nm_toggleNote = "Consejo: /uiv togglenames hace lo mismo en una macro.",
+    nm_toggledOff = "nombres sobre la cabeza ocultos. Usa /uiv togglenames para volver a mostrarlos.",
+    nm_toggledOn = "nombres sobre la cabeza visibles otra vez.",
     nm_secTooltip = "Tooltip",
     nm_tooltipCursor = "Junto al cursor",
     nm_tooltipCursor_tip = "Muestra el tooltip junto al cursor en vez de en la esquina de la pantalla.",
@@ -457,6 +527,94 @@ local function HookTooltip()
 end
 
 ---------------------------------------------------------------------------
+-- Names above heads (the game's own settings)
+---------------------------------------------------------------------------
+-- Each option is one or more game variables. "invert" means the variable
+-- hides names when on (UnitNameForceHideMinus), so the checkbox shows the
+-- opposite. "toggle" options are hidden by "Hide all names".
+local WORLD_NAMES = {
+    { key = "wAlliedPlayers",     cvars = { "UnitNameFriendlyPlayerName" }, toggle = true },
+    { key = "wEnemyPlayers",      cvars = { "UnitNameEnemyPlayerName" }, toggle = true },
+    { key = "wHostileNpcs",       cvars = { "UnitNameHostleNPC" }, toggle = true },
+    { key = "wInteractiveNpcs",   cvars = { "UnitNameInteractiveNPC" }, toggle = true },
+    { key = "wSpecialNpcs",       cvars = { "UnitNameFriendlySpecialNPCName" }, toggle = true },
+    { key = "wAllNpcs",           cvars = { "UnitNameNPC" }, toggle = true },
+    { key = "wPets",              cvars = { "UnitNameFriendlyPetName", "UnitNameEnemyPetName" }, toggle = true },
+    { key = "wMinions",           cvars = { "UnitNameFriendlyGuardianName", "UnitNameEnemyGuardianName",
+                                            "UnitNameFriendlyMinionName", "UnitNameEnemyMinionName" }, toggle = true },
+    { key = "wTotems",            cvars = { "UnitNameFriendlyTotemName", "UnitNameEnemyTotemName" }, toggle = true },
+    { key = "wCritters",          cvars = { "UnitNameNonCombatCreatureName" }, toggle = true },
+    { key = "wOwn",               cvars = { "UnitNameOwn" }, toggle = true },
+    { key = "wWeak",              cvars = { "UnitNameForceHideMinus" }, invert = true },
+    { key = "wGuild",             cvars = { "UnitNamePlayerGuild" } },
+    { key = "wTitles",            cvars = { "UnitNamePlayerPVPTitle" } },
+}
+
+local function CVarExists(name)
+    return GetCVar(name) ~= nil
+end
+
+-- An option is available if at least one of its variables exists here.
+local function OptionAvailable(option)
+    for _, name in ipairs(option.cvars) do
+        if CVarExists(name) then return true end
+    end
+    return false
+end
+
+-- On if its first existing variable is on (or off, for inverted options).
+local function OptionOn(option)
+    for _, name in ipairs(option.cvars) do
+        local value = GetCVar(name)
+        if value ~= nil then
+            local on = value == "1"
+            if option.invert then on = not on end
+            return on
+        end
+    end
+    return false
+end
+
+local function SetOption(option, on)
+    local value = on
+    if option.invert then value = not on end
+    for _, name in ipairs(option.cvars) do
+        if CVarExists(name) then pcall(SetCVar, name, value and "1" or "0") end
+    end
+end
+
+local function NamesHidden()
+    return mod.db.worldNamesSaved ~= nil
+end
+
+-- Hides every "toggle" category, saving each variable's value, or puts the
+-- saved values back. The saved values survive logging out.
+local function ToggleWorldNames()
+    local db = mod.db
+    if db.worldNamesSaved then
+        for name, value in pairs(db.worldNamesSaved) do
+            if CVarExists(name) then pcall(SetCVar, name, value) end
+        end
+        db.worldNamesSaved = nil
+        return true
+    end
+    local saved = {}
+    for _, option in ipairs(WORLD_NAMES) do
+        if option.toggle then
+            for _, name in ipairs(option.cvars) do
+                local value = GetCVar(name)
+                if value ~= nil then
+                    saved[name] = value
+                    pcall(SetCVar, name, "0")
+                end
+            end
+        end
+    end
+    db.worldNamesSaved = saved
+    return false
+end
+
+---------------------------------------------------------------------------
 -- Module hooks
 ---------------------------------------------------------------------------
 function mod.SetEnabled(v)
@@ -570,6 +728,51 @@ function mod.BuildOptions(parent, y)
     end
     y = y - 12
 
+    -- Names above heads
+    ns.CreateSection(parent, L.nm_secWorld, y)
+    y = y - 30
+    ns.CreateNote(parent, L.nm_worldNote, y)
+    y = y - 34
+    local notHidden = function() return not NamesHidden() end
+    local shown = {}
+    for _, option in ipairs(WORLD_NAMES) do
+        if OptionAvailable(option) then shown[#shown + 1] = option end
+    end
+    for i, option in ipairs(shown) do
+        local col = (i - 1) % 2
+        local tip = L["nm_" .. option.key .. "_tip"]
+        add(ns.CreateCheck(parent, L["nm_" .. option.key], y,
+            function() return OptionOn(option) end,
+            function(v) SetOption(option, v); refreshAll() end,
+            { x = col == 0 and COL1 or COL2, width = WIDTH,
+              tooltip = tip ~= "nm_" .. option.key .. "_tip" and tip or nil,
+              enabledIf = notHidden }))
+        if col == 1 or i == #shown then y = y - 28 end
+    end
+    y = y - 8
+    local toggleButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    toggleButton:SetSize(220, 24)
+    toggleButton:SetPoint("TOPLEFT", 20, y)
+    toggleButton:SetScript("OnClick", function()
+        ToggleWorldNames()
+        refreshAll()
+    end)
+    y = y - 32
+    local stateNote = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    stateNote:SetPoint("TOPLEFT", 18, y)
+    stateNote:SetWidth(380)
+    stateNote:SetJustifyH("LEFT")
+    add(function()
+        if NamesHidden() then
+            toggleButton:SetText(L.nm_showAgain)
+            stateNote:SetText(L.nm_hiddenNote .. " " .. L.nm_toggleNote)
+        else
+            toggleButton:SetText(L.nm_hideAll)
+            stateNote:SetText(L.nm_toggleNote)
+        end
+    end)
+    y = y - 40
+
     -- Tooltip
     ns.CreateSection(parent, L.nm_secTooltip, y)
     y = y - 32
@@ -591,6 +794,18 @@ function mod.BuildOptions(parent, y)
     ns.CreateNote(parent, L.nm_note, y)
 
     return refreshAll
+end
+
+function mod.Command(cmd)
+    if cmd == "togglenames" then
+        if ToggleWorldNames() then
+            ns.Print(L.nm_toggledOn)
+        else
+            ns.Print(L.nm_toggledOff)
+        end
+        return true
+    end
+    return false
 end
 
 function mod.PrintStatus()

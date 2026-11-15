@@ -69,7 +69,7 @@ ns.AddLocale("en", {
         .. "5. Save the file and restart the game.",
     helpCopy = "Click the box and press Ctrl+C to copy the command.",
     helpFooter = "If the addon doesn't load you can't open this window, so these steps are also in README.txt inside the addon folder.",
-    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv options, /uiv help, /uiv status",
+    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv options, /uiv help, /uiv status, /uiv togglenames",
 })
 ns.AddLocale("es", {
     loaded = "activo. Escribe /uiv para abrir las opciones.",
@@ -106,7 +106,7 @@ ns.AddLocale("es", {
         .. "5. Guarda el archivo y reinicia el juego.",
     helpCopy = "Haz clic en el recuadro y presiona Ctrl+C para copiar el comando.",
     helpFooter = "Si el addon no carga no podrás abrir esta ventana, así que estos pasos también están en README.txt dentro de la carpeta del addon.",
-    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv opciones, /uiv ayuda, /uiv estado",
+    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv opciones, /uiv ayuda, /uiv estado, /uiv togglenames",
 })
 
 function ns.Print(msg) print(ns.PREFIX .. msg) end
