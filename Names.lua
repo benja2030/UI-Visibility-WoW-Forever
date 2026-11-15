@@ -109,6 +109,11 @@ ns.AddLocale("en", {
     nm_showButton_tip = "Shows a small button that hides or shows all names above heads with one click.",
     nm_buttonMode = "Button mode",
     nm_buttonStyle = "Button icon",
+    nm_quickTarget = "Hides",
+    nm_quickTarget_tip = "Names and interface also hides the whole interface, like Alt+Z. The button on screen stays visible so you can bring everything back. It can't hide or show the interface during combat.",
+    target_names = "Names only",
+    target_all = "Names and interface",
+    nm_combatBlocked = "the interface can't be hidden or shown during combat. Try again after the fight, or press Alt+Z.",
     style_eye = "Simple eye",
     style_spell = "Game icon",
     nm_buttonIdle = "Opacity away",
@@ -210,6 +215,11 @@ ns.AddLocale("es", {
     nm_showButton_tip = "Muestra un botón pequeño que oculta o muestra todos los nombres sobre la cabeza con un clic.",
     nm_buttonMode = "Modo del botón",
     nm_buttonStyle = "Ícono del botón",
+    nm_quickTarget = "Oculta",
+    nm_quickTarget_tip = "Nombres e interfaz también oculta toda la interfaz, como Alt+Z. El botón en pantalla sigue visible para que puedas volver a mostrar todo. No puede ocultar ni mostrar la interfaz durante el combate.",
+    target_names = "Solo nombres",
+    target_all = "Nombres e interfaz",
+    nm_combatBlocked = "la interfaz no se puede ocultar ni mostrar en combate. Inténtalo después de la pelea, o presiona Alt+Z.",
     style_eye = "Ojo simple",
     style_spell = "Ícono del juego",
     nm_buttonIdle = "Opacidad sin mouse",
@@ -259,6 +269,7 @@ local mod = {
         showButton = false,
         buttonMode = "shown",   -- "shown" or "hover"
         buttonStyle = "style_eye", -- "style_eye" (drawn eye) or "style_spell" (game icon)
+        quickTarget = "target_names", -- "target_names" or "target_all" (names and interface)
         buttonIdleAlpha = 30,   -- % while not hovered, in "hover" mode
         buttonSize = 32,
         buttonPoint = nil,      -- saved position   -- tenths of a second before world tooltips show
@@ -664,7 +675,10 @@ end
 local optionRefreshers = {} -- open option pages, refreshed after a toggle
 local BUTTON_LINGER = 0.3
 
-local toggle = CreateFrame("Button", "UIVisibilityNamesButton", UIParent)
+-- The button belongs to the world frame, not to the interface, so it stays
+-- visible when "Names and interface" hides the interface. It uses the
+-- interface's scale so its size matches everything else.
+local toggle = CreateFrame("Button", "UIVisibilityNamesButton", WorldFrame)
 toggle:SetFrameStrata("MEDIUM")
 toggle:SetClampedToScreen(true)
 toggle:SetMovable(true)
@@ -747,8 +761,24 @@ local function ShowToggleTooltip(self)
 end
 
 -- Toggles the names and updates everything that shows their state.
+-- Returns true if names are shown again, false if hidden, and nil if the
+-- interface part had to wait because of combat (then nothing changes).
 local function ToggleAll()
+    local db = mod.db
+    local hiding = db.worldNamesSaved == nil
+    local uiHidden = not UIParent:IsShown()
+    local touchesUI = (hiding and db.quickTarget == "target_all") or (not hiding and uiHidden)
+    if touchesUI and InCombatLockdown() then
+        ns.Print(L.nm_combatBlocked)
+        return nil
+    end
     local shownAgain = ToggleWorldNames()
+    if shownAgain then
+        -- Bringing names back always brings the interface back too.
+        if uiHidden then UIParent:Show() end
+    elseif db.quickTarget == "target_all" then
+        UIParent:Hide()
+    end
     UpdateToggleLook()
     for _, refresh in ipairs(optionRefreshers) do refresh() end
     if toggle:IsMouseOver() and GameTooltip:IsOwned(toggle) then ShowToggleTooltip(toggle) end
@@ -757,17 +787,27 @@ end
 
 local function ApplyToggleLayout()
     local db = mod.db
+    toggle:SetScale(UIParent:GetScale())
     toggle:SetSize(db.buttonSize, db.buttonSize)
     toggleCross:SetSize(db.buttonSize * 0.7, db.buttonSize * 0.7)
     toggle:ClearAllPoints()
     local p = db.buttonPoint
     if p then
-        toggle:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+        toggle:SetPoint(p[1], WorldFrame, p[2], p[3], p[4])
     else
-        toggle:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+        toggle:SetPoint("CENTER", WorldFrame, "CENTER", 0, 200)
     end
     UpdateToggleLook()
 end
+
+-- Keep the button's size and place when the interface scale or the screen
+-- size changes.
+local layoutEvents = CreateFrame("Frame")
+layoutEvents:RegisterEvent("UI_SCALE_CHANGED")
+layoutEvents:RegisterEvent("DISPLAY_SIZE_CHANGED")
+layoutEvents:SetScript("OnEvent", function()
+    if mod.db then ApplyToggleLayout() end
+end)
 
 toggle:SetScript("OnClick", function()
     if IsShiftKeyDown() then return end -- Shift is for moving
@@ -947,6 +987,10 @@ function mod.BuildOptions(parent, y)
     ns.CreateSection(parent, L.nm_secQuick, y)
     y = y - 30
     y = y - ns.CreateNote(parent, L.nm_quickNote, y) - 14
+    add(ns.CreateDropdown(parent, L.nm_quickTarget, y, { "target_names", "target_all" },
+        function() return db().quickTarget end, set("quickTarget"),
+        { tooltip = L.nm_quickTarget_tip }))
+    y = y - 36
     local toggleButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     toggleButton:SetSize(220, 24)
     toggleButton:SetPoint("TOPLEFT", 20, y)
@@ -1026,9 +1070,10 @@ end
 
 function mod.Command(cmd)
     if cmd == "togglenames" then
-        if ToggleAll() then
+        local result = ToggleAll()
+        if result == true then
             ns.Print(L.nm_toggledOn)
-        else
+        elseif result == false then
             ns.Print(L.nm_toggledOff)
         end
         return true
