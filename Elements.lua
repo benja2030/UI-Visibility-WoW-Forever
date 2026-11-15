@@ -23,8 +23,12 @@ local MODES = { "shown", "hidden", "hover" }
 local LINGER = 0.5 -- seconds an element stays visible after the mouse leaves
 
 ns.AddLocale("en", {
-    linkHover = "Show all On hover elements together",
-    modesHeader = "Click a button to change the mode:",
+    linkHover = "Show hover elements together",
+    linkHover_tip = "Hovering any element in On hover mode shows all of them at once.",
+    minimapHover_tip = "Hovering the minimap shows every element in On hover mode.",
+    sec_options = "Options",
+    sec_elements = "Elements",
+    modesHeader = "Elements",
     st_notShown = "not shown right now",
     st_edit = "Edit Mode",
     st_hoverOn = "mouse over it", st_hoverOff = "waiting for the mouse",
@@ -32,8 +36,12 @@ ns.AddLocale("en", {
     st_found = "%d found",
 })
 ns.AddLocale("es", {
-    linkHover = "Mostrar juntos los elementos Con el mouse",
-    modesHeader = "Haz clic en un botón para cambiar el modo:",
+    linkHover = "Mostrar juntos al apuntar",
+    linkHover_tip = "Apuntar a cualquier elemento en modo Con el mouse muestra todos a la vez.",
+    minimapHover_tip = "Apuntar al minimapa muestra todos los elementos en modo Con el mouse.",
+    sec_options = "Opciones",
+    sec_elements = "Elementos",
+    modesHeader = "Elementos",
     st_notShown = "no se muestra ahora",
     st_edit = "Modo Edición",
     st_hoverOn = "mouse encima", st_hoverOff = "esperando el mouse",
@@ -270,26 +278,31 @@ function ns.NewElementsModule(cfg)
 
         add(ns.CreateCheck(parent, L.enabled, y,
             function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
-        y = y - 28
+        y = y - 40
+
+        ns.CreateSection(parent, L.sec_options, y)
+        y = y - 32
         add(ns.CreateCheck(parent, L.linkHover, y,
-            function() return mod.db.linkHover end, function(v) mod.db.linkHover = v; dirty = true end))
+            function() return mod.db.linkHover end, function(v) mod.db.linkHover = v; dirty = true end,
+            { tooltip = L.linkHover_tip }))
         y = y - 28
         if cfg.minimapHover then
             add(ns.CreateCheck(parent, L[cfg.minimapHoverLabel], y,
-                function() return mod.db.minimapHover end, function(v) mod.db.minimapHover = v; dirty = true end))
+                function() return mod.db.minimapHover end, function(v) mod.db.minimapHover = v; dirty = true end,
+                { tooltip = L.minimapHover_tip }))
             y = y - 28
         end
-        y = y - 8
+        y = y - 12
 
-        ns.CreateHeader(parent, L.modesHeader, y)
-        y = y - 26
+        ns.CreateSection(parent, L.sec_elements, y)
+        y = y - 34
         for _, element in ipairs(cfg.elements) do
-            add(ns.CreateCycle(parent, L[element.label], y, MODES,
+            add(ns.CreateDropdown(parent, L[element.label], y, MODES,
                 function() return mod.db.modes[element.key] end,
                 function(v) mod.db.modes[element.key] = v; dirty = true end))
-            y = y - 30
+            y = y - 32
         end
-        if cfg.noteKey then ns.CreateNote(parent, L[cfg.noteKey], y - 2) end
+        if cfg.noteKey then ns.CreateNote(parent, L[cfg.noteKey], y - 4) end
 
         return function() for _, r in ipairs(refreshers) do r() end end
     end

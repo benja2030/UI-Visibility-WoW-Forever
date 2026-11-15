@@ -47,6 +47,10 @@ ns.AddLocale("en", {
     later = "Later",
     help = "Help",
     tab_general = "General",
+    generalTitle = "General Options",
+    sec_modules = "Modules",
+    sec_appearance = "Appearance",
+    sec_language = "Language and help",
     open = "Open",
     fadeSmooth = "Fade smoothness",
     fadeNote = "0 is instant. Higher numbers fade more slowly.",
@@ -78,6 +82,10 @@ ns.AddLocale("es", {
     later = "Más tarde",
     help = "Ayuda",
     tab_general = "General",
+    generalTitle = "Opciones generales",
+    sec_modules = "Módulos",
+    sec_appearance = "Apariencia",
+    sec_language = "Idioma y ayuda",
     open = "Abrir",
     fadeSmooth = "Suavidad del fundido",
     fadeNote = "0 es instantáneo. Números más altos se desvanecen más lento.",
@@ -177,6 +185,20 @@ end
 ---------------------------------------------------------------------------
 -- Option widgets shared by the modules
 ---------------------------------------------------------------------------
+-- Shows an explanation when the mouse is over a label (a FontString).
+function ns.AttachTooltip(parent, fontString, title, tip)
+    if not tip then return end
+    local hover = CreateFrame("Frame", nil, parent)
+    hover:SetAllPoints(fontString)
+    hover:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(title, 1, 0.82, 0)
+        GameTooltip:AddLine(tip, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
 -- A checkbox with a label. Optional "opts":
 --   x        horizontal position (default 16; use 32 or more to indent an
 --            option that depends on the one above, or ~210 for a second column)
@@ -227,6 +249,43 @@ function ns.CreateHeader(parent, text, y)
     fs:SetText(text)
 end
 
+-- Page header: icon, "UI Visibility" in gold, a dot and the page name in
+-- white, over a dark band with a gold line that fades to the right.
+-- Takes 44 pixels from the top of "parent".
+function ns.CreatePageHeader(parent, pageName)
+    local band = parent:CreateTexture(nil, "BACKGROUND")
+    band:SetPoint("TOPLEFT", 4, -2)
+    band:SetPoint("TOPRIGHT", -4, -2)
+    band:SetHeight(36)
+    band:SetColorTexture(0, 0, 0, 0.45)
+
+    local icon = parent:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(22, 22)
+    icon:SetPoint("LEFT", band, "LEFT", 10, 0)
+    icon:SetTexture(ns.ICON)
+
+    local title = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    title:SetText("UI Visibility")
+
+    local dot = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    dot:SetPoint("LEFT", title, "RIGHT", 8, 0)
+    dot:SetText("\226\128\162") -- bullet
+
+    local name = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    name:SetPoint("LEFT", dot, "RIGHT", 8, 0)
+    name:SetText(pageName)
+
+    local line = parent:CreateTexture(nil, "ARTWORK")
+    line:SetPoint("TOPLEFT", band, "BOTTOMLEFT", 0, 0)
+    line:SetPoint("TOPRIGHT", band, "BOTTOMRIGHT", 0, 0)
+    line:SetHeight(1)
+    line:SetColorTexture(1, 1, 1, 1)
+    local ok = pcall(line.SetGradient, line, "HORIZONTAL",
+        CreateColor(1, 0.82, 0, 0.9), CreateColor(1, 0.82, 0, 0))
+    if not ok then line:SetColorTexture(1, 0.82, 0, 0.5) end
+end
+
 -- A section title with a thin line under it. Takes about 30 pixels.
 function ns.CreateSection(parent, text, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -242,15 +301,16 @@ end
 function ns.CreateNote(parent, text, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     fs:SetPoint("TOPLEFT", 18, y)
-    fs:SetWidth(320)
+    fs:SetWidth(380)
     fs:SetJustifyH("LEFT")
     fs:SetText(text)
 end
 
-function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, suffix)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    text:SetPoint("TOPLEFT", 18, y)
+function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, suffix, opts)
+    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    text:SetPoint("TOPLEFT", 20, y)
     text:SetText(label)
+    ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
     local value = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     value:SetPoint("TOPLEFT", 250, y)
@@ -288,7 +348,7 @@ end
 -- A slider from minV to maxV in steps of 1. Uses the game's current slider
 -- (MinimalSliderWithSteppersTemplate); if this client doesn't have it,
 -- falls back to the - / + stepper. "format" turns a value into its label.
-function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format)
+function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format, opts)
     local ok, refresh = pcall(function()
         local slider = CreateFrame("Frame", nil, parent, "MinimalSliderWithSteppersTemplate")
         slider:SetPoint("TOPLEFT", 180, y + 6)
@@ -302,13 +362,14 @@ function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format)
             setter(math.floor(value + 0.5))
         end, slider)
 
-        local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("TOPLEFT", 18, y)
+        local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        text:SetPoint("TOPLEFT", 20, y)
         text:SetText(label)
+        ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
         return function() slider:SetValue(getter()) end
     end)
     if ok then return refresh end
-    return ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, 1, "")
+    return ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, 1, "", opts)
 end
 
 -- A label with a dropdown menu to pick one of a list of values. "values" are
@@ -317,10 +378,11 @@ end
 -- doesn't have it.
 local optionDropdownCount = 0
 
-function ns.CreateDropdown(parent, label, y, values, getter, setter)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    text:SetPoint("TOPLEFT", 18, y)
+function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
+    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    text:SetPoint("TOPLEFT", 20, y)
     text:SetText(label)
+    ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
     local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     if ok and dropdown and dropdown.SetupMenu then
@@ -599,20 +661,23 @@ end
 -- language and help. "openModule" decides where Open takes you.
 local function BuildGeneral(parent, y, openModule)
     local refreshers = {}
-    ns.CreateHeader(parent, L.modules, y)
-    y = y - 24
+
+    ns.CreateSection(parent, L.sec_modules, y)
+    y = y - 32
     for _, mod in ipairs(ns.moduleList) do
         refreshers[#refreshers + 1] = ns.CreateCheck(parent, L[mod.titleKey], y,
             function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end)
         local open = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
         open:SetSize(80, 22)
-        open:SetPoint("TOPLEFT", 260, y - 2)
+        open:SetPoint("TOPLEFT", 280, y - 2)
         open:SetText(L.open)
         open:SetScript("OnClick", function() openModule(mod) end)
         y = y - 28
     end
+    y = y - 12
 
-    y = y - 16
+    ns.CreateSection(parent, L.sec_appearance, y)
+    y = y - 34
     refreshers[#refreshers + 1] = ns.CreateSlider(parent, L.fadeSmooth, y,
         function() return ns.db.fadeSmoothness end,
         function(v) ns.db.fadeSmoothness = v end,
@@ -621,12 +686,13 @@ local function BuildGeneral(parent, y, openModule)
             v = math.floor(v + 0.5)
             if v == 0 then return L.instant end
             return tostring(v)
-        end)
-    y = y - 24
-    ns.CreateNote(parent, L.fadeNote, y)
+        end,
+        { tooltip = L.fadeNote })
     y = y - 40
 
-    CreateBottomButtons(parent, "TOPLEFT", 18, y)
+    ns.CreateSection(parent, L.sec_language, y)
+    y = y - 42
+    CreateBottomButtons(parent, "TOPLEFT", 20, y)
     return function() for _, r in ipairs(refreshers) do r() end end
 end
 
@@ -659,7 +725,9 @@ function SelectTab(key)
         local pane = CreateFrame("Frame", nil, window)
         pane:SetPoint("TOPLEFT", 0, paneTop)
         pane:SetPoint("BOTTOMRIGHT", 0, 8)
-        local content = CreateScrollArea(pane, 0)
+        local pageName = key == "general" and L.generalTitle or L[ns.moduleByKey[key].titleKey]
+        ns.CreatePageHeader(pane, pageName)
+        local content = CreateScrollArea(pane, -46)
         local refresh = BuildPane(key, content)
         FitContent(content)
         paneRefresh[key] = function() refresh(); FitContent(content) end
@@ -697,7 +765,7 @@ local function CreateWindow()
     end
     local rows = math.ceil(#keys / TABS_PER_ROW)
     paneTop = -36 - rows * 28
-    window:SetHeight(520 + rows * 28)
+    window:SetHeight(560 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)
@@ -737,16 +805,7 @@ local function RegisterSettings()
 
     local main = CreateFrame("Frame")
     main:Hide()
-    local mainIcon = main:CreateTexture(nil, "OVERLAY")
-    mainIcon:SetSize(32, 32)
-    mainIcon:SetPoint("TOPLEFT", 16, -10)
-    mainIcon:SetTexture(ns.ICON)
-    local title = main:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", mainIcon, "RIGHT", 8, 0)
-    title:SetText("UI Visibility")
-    local subtitle = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOPLEFT", mainIcon, "BOTTOMLEFT", 0, -6)
-    subtitle:SetText(L.subtitle)
+    ns.CreatePageHeader(main, L.generalTitle)
 
     ns.settingsCategory = Settings.RegisterCanvasLayoutCategory(main, "UI Visibility")
 
@@ -755,10 +814,8 @@ local function RegisterSettings()
         for _, mod in ipairs(ns.moduleList) do
             local page = CreateFrame("Frame")
             page:Hide()
-            local pageTitle = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-            pageTitle:SetPoint("TOPLEFT", 16, -16)
-            pageTitle:SetText(L[mod.titleKey])
-            local content = CreateScrollArea(page, -40)
+            ns.CreatePageHeader(page, L[mod.titleKey])
+            local content = CreateScrollArea(page, -46)
             local refresh = mod.BuildOptions(content, -8)
             page:SetScript("OnShow", function() refresh(); FitContent(content) end)
             mod.settingsCategory = Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, L[mod.titleKey])
@@ -767,7 +824,7 @@ local function RegisterSettings()
 
     -- "Open" goes to the module's sub-page, or to its tab in the window if
     -- sub-pages aren't available.
-    local mainContent = CreateScrollArea(main, -64)
+    local mainContent = CreateScrollArea(main, -46)
     local mainRefresh = BuildGeneral(mainContent, -8, function(mod)
         if mod.settingsCategory and Settings.OpenToCategory then
             local ok = pcall(Settings.OpenToCategory, mod.settingsCategory:GetID())

@@ -20,14 +20,21 @@ local BLIZZ_ADDON = "Blizzard_PersonalResourceDisplay"
 ns.AddLocale("en", {
     tab_prd = "Resources",
     prd_title = "Personal Resource Display",
-    prd_textCombat = "Bar text only in combat",
-    prd_showWhen = "Show out of combat while changing:",
+    prd_secOpacity = "Opacity",
+    prd_secTracked = "Counts as regenerating",
+    prd_secText = "Bar text",
+    prd_secTiming = "Timing",
+    prd_textCombat = "Only in combat",
+    prd_textCombat_tip = "Hides the health and resource numbers out of combat. Turn on Show Bar Text in Edit Mode for the numbers to show at all.",
     prd_health = "Health",
+    rage_tip = "Rage drains to zero out of combat, so it counts while it's draining.",
+    other_tip = "Runic power, focus and other resources.",
     mana = "Mana", rage = "Rage", energy = "Energy", other = "Other resources",
-    prd_opacity = "Opacity:",
-    prd_inCombat = "  In combat", prd_regen = "  Regenerating", prd_full = "  Full bars",
+    prd_inCombat = "In combat", prd_regen = "Regenerating", prd_full = "Full bars",
     prd_maxDelay = "Initial wait",
-    prd_margin = "Margin after last pulse",
+    prd_maxDelay_tip = "How long to wait after the last change before hiding, until the addon learns how often you regenerate.",
+    prd_margin = "Margin",
+    prd_margin_tip = "Extra time after the expected next regeneration tick. Raise it if the display hides while still regenerating; lower it if it takes too long to hide.",
     prd_st_disabled = "disabled", prd_st_combat = "combat", prd_st_regen = "regenerating", prd_st_idle = "idle",
     prd_r_disabled = "module disabled", prd_r_combat = "in combat", prd_r_dead = "dead",
     prd_r_partial = "bars not full", prd_r_full = "bars full",
@@ -41,14 +48,21 @@ ns.AddLocale("en", {
 ns.AddLocale("es", {
     tab_prd = "Recursos",
     prd_title = "Personal Resource Display",
-    prd_textCombat = "Texto de las barras solo en combate",
-    prd_showWhen = "Mostrar fuera de combate cuando cambia:",
+    prd_secOpacity = "Opacidad",
+    prd_secTracked = "Cuenta como regeneración",
+    prd_secText = "Texto de las barras",
+    prd_secTiming = "Tiempos",
+    prd_textCombat = "Solo en combate",
+    prd_textCombat_tip = "Oculta los números de vida y recurso fuera de combate. Activa Show Bar Text en el Modo Edición para que los números se muestren.",
     prd_health = "Vida",
+    rage_tip = "La rabia baja a cero fuera de combate, así que cuenta mientras baja.",
+    other_tip = "Poder rúnico, enfoque y otros recursos.",
     mana = "Maná", rage = "Rabia", energy = "Energía", other = "Otros recursos",
-    prd_opacity = "Opacidad:",
-    prd_inCombat = "  En combate", prd_regen = "  Regenerando", prd_full = "  Barras llenas",
+    prd_inCombat = "En combate", prd_regen = "Regenerando", prd_full = "Barras llenas",
     prd_maxDelay = "Espera inicial",
-    prd_margin = "Margen tras el último pulso",
+    prd_maxDelay_tip = "Cuánto esperar tras el último cambio antes de ocultar, hasta que el addon aprenda cada cuánto regeneras.",
+    prd_margin = "Margen",
+    prd_margin_tip = "Tiempo extra después del siguiente pulso de regeneración esperado. Súbelo si se oculta mientras aún regeneras; bájalo si tarda demasiado en ocultarse.",
     prd_st_disabled = "desactivado", prd_st_combat = "combate", prd_st_regen = "regenerando", prd_st_idle = "en reposo",
     prd_r_disabled = "módulo desactivado", prd_r_combat = "en combate", prd_r_dead = "muerto",
     prd_r_partial = "barras incompletas", prd_r_full = "barras llenas",
@@ -406,43 +420,61 @@ function mod.BuildOptions(parent, y)
     local function add(r) refreshers[#refreshers + 1] = r end
     local function set(fn) return function(v) fn(v); dirty = true end end
     local db = function() return mod.db end
+    local function tip(key)
+        local t = L[key .. "_tip"]
+        if t ~= key .. "_tip" then return t end
+    end
 
     add(ns.CreateCheck(parent, L.enabled, y,
         function() return db().enabled end, function(v) mod.SetEnabled(v) end))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.prd_textCombat, y,
-        function() return db().textCombatOnly end, set(function(v) db().textCombatOnly = v end)))
-    y = y - 36
+    y = y - 40
 
-    ns.CreateHeader(parent, L.prd_showWhen, y)
-    y = y - 22
-    add(ns.CreateCheck(parent, L.prd_health, y,
-        function() return db().health end, set(function(v) db().health = v end)))
-    y = y - 28
-    for _, key in ipairs({ "mana", "rage", "energy", "other" }) do
-        add(ns.CreateCheck(parent, L[key], y,
-            function() return db().power[key] end, set(function(v) db().power[key] = v end)))
-        y = y - 28
-    end
-
-    y = y - 10
-    ns.CreateHeader(parent, L.prd_opacity, y)
-    y = y - 24
+    ns.CreateSection(parent, L.prd_secOpacity, y)
+    y = y - 32
     for _, item in ipairs({
         { "prd_inCombat", "alphaCombat" }, { "prd_regen", "alphaRegen" }, { "prd_full", "alphaIdle" },
     }) do
         add(ns.CreateStepper(parent, L[item[1]], y,
             function() return db()[item[2]] end, set(function(v) db()[item[2]] = v end), 0, 100, 10, "%"))
-        y = y - 26
+        y = y - 28
     end
-    y = y - 10
+    y = y - 12
+
+    ns.CreateSection(parent, L.prd_secTracked, y)
+    y = y - 32
+    local items = {
+        { "prd_health", function() return db().health end, function(v) db().health = v end },
+    }
+    for _, key in ipairs({ "mana", "rage", "energy", "other" }) do
+        items[#items + 1] = { key,
+            function() return db().power[key] end, function(v) db().power[key] = v end }
+    end
+    for i, item in ipairs(items) do
+        local col = (i - 1) % 2
+        add(ns.CreateCheck(parent, L[item[1]], y, item[2], set(item[3]),
+            { x = col == 0 and 16 or 216, width = 160, tooltip = tip(item[1]) }))
+        if col == 1 or i == #items then y = y - 28 end
+    end
+    y = y - 12
+
+    ns.CreateSection(parent, L.prd_secText, y)
+    y = y - 32
+    add(ns.CreateCheck(parent, L.prd_textCombat, y,
+        function() return db().textCombatOnly end, set(function(v) db().textCombatOnly = v end),
+        { tooltip = L.prd_textCombat_tip }))
+    y = y - 40
+
+    ns.CreateSection(parent, L.prd_secTiming, y)
+    y = y - 32
     add(ns.CreateStepper(parent, L.prd_maxDelay, y,
-        function() return db().maxDelay end, function(v) db().maxDelay = v end, 2, 15, 1, " s"))
-    y = y - 26
+        function() return db().maxDelay end, function(v) db().maxDelay = v end, 2, 15, 1, " s",
+        { tooltip = L.prd_maxDelay_tip }))
+    y = y - 28
     -- Stored in tenths so the stepper works with whole numbers.
     add(ns.CreateStepper(parent, L.prd_margin, y,
         function() return db().margin end, function(v) db().margin = v end, 0, 10, 1,
-        function(v) return string.format("%.1f s", v / 10) end))
+        function(v) return string.format("%.1f s", v / 10) end,
+        { tooltip = L.prd_margin_tip }))
 
     return function() for _, r in ipairs(refreshers) do r() end end
 end

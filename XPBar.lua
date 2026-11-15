@@ -16,20 +16,32 @@ local BLIZZ_ADDON = "Blizzard_StatusTrackingBar"
 ns.AddLocale("en", {
     tab_xp = "XP bar",
     xp_title = "Experience Bar",
-    xp_hover = "Show on mouse hover",
-    xp_onGain = "Show after gaining experience",
+    xp_secShow = "Show the bar",
+    xp_secHidden = "When hidden",
+    xp_hover = "On mouse hover",
+    xp_hover_tip = "Shows the bar while the mouse is over where it is.",
+    xp_onGain = "After gaining XP",
+    xp_onGain_tip = "Shows the bar for a while after gaining experience or leveling up.",
     xp_duration = "Time shown",
-    xp_hiddenOpacity = "Opacity when hidden",
+    xp_duration_tip = "How long the bar stays after gaining experience.",
+    xp_hiddenOpacity = "Opacity",
+    xp_hiddenOpacity_tip = "0% hides it completely. A little opacity helps you remember where it is.",
     xp_r_edit = "Edit Mode", xp_r_disabled = "module disabled", xp_r_hover = "mouse over the bar",
     xp_r_gain = "experience gained (%.1fs left)", xp_r_hidden = "hidden",
 })
 ns.AddLocale("es", {
     tab_xp = "Barra XP",
     xp_title = "Barra de experiencia",
-    xp_hover = "Mostrar al pasar el mouse",
-    xp_onGain = "Mostrar al ganar experiencia",
+    xp_secShow = "Mostrar la barra",
+    xp_secHidden = "Cuando está oculta",
+    xp_hover = "Al pasar el mouse",
+    xp_hover_tip = "Muestra la barra mientras el mouse está donde se ubica.",
+    xp_onGain = "Al ganar experiencia",
+    xp_onGain_tip = "Muestra la barra un momento después de ganar experiencia o subir de nivel.",
     xp_duration = "Tiempo visible",
-    xp_hiddenOpacity = "Opacidad oculta",
+    xp_duration_tip = "Cuánto tiempo se queda la barra después de ganar experiencia.",
+    xp_hiddenOpacity = "Opacidad",
+    xp_hiddenOpacity_tip = "0% la oculta por completo. Un poco de opacidad ayuda a recordar dónde está.",
     xp_r_edit = "Modo Edición", xp_r_disabled = "módulo desactivado", xp_r_hover = "mouse sobre la barra",
     xp_r_gain = "experiencia ganada (quedan %.1fs)", xp_r_hidden = "oculta",
 })
@@ -115,16 +127,25 @@ function mod.BuildOptions(parent, y)
 
     add(ns.CreateCheck(parent, L.enabled, y,
         function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
-    y = y - 36
-    add(ns.CreateCheck(parent, L.xp_hover, y, function() return mod.db.hover end, set("hover")))
-    y = y - 28
-    add(ns.CreateCheck(parent, L.xp_onGain, y, function() return mod.db.showOnGain end, set("showOnGain")))
     y = y - 40
+
+    ns.CreateSection(parent, L.xp_secShow, y)
+    y = y - 32
+    add(ns.CreateCheck(parent, L.xp_hover, y, function() return mod.db.hover end, set("hover"),
+        { x = 16, width = 160, tooltip = L.xp_hover_tip }))
+    add(ns.CreateCheck(parent, L.xp_onGain, y, function() return mod.db.showOnGain end, set("showOnGain"),
+        { x = 216, width = 160, tooltip = L.xp_onGain_tip }))
+    y = y - 32
     add(ns.CreateStepper(parent, L.xp_duration, y,
-        function() return mod.db.gainDuration end, set("gainDuration"), 1, 30, 1, " s"))
-    y = y - 28
+        function() return mod.db.gainDuration end, set("gainDuration"), 1, 30, 1, " s",
+        { tooltip = L.xp_duration_tip }))
+    y = y - 40
+
+    ns.CreateSection(parent, L.xp_secHidden, y)
+    y = y - 32
     add(ns.CreateStepper(parent, L.xp_hiddenOpacity, y,
-        function() return mod.db.hiddenAlpha end, set("hiddenAlpha"), 0, 90, 10, "%"))
+        function() return mod.db.hiddenAlpha end, set("hiddenAlpha"), 0, 90, 10, "%",
+        { tooltip = L.xp_hiddenOpacity_tip }))
 
     return function() for _, r in ipairs(refreshers) do r() end end
 end

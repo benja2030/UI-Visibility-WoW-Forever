@@ -12,7 +12,7 @@ local L = ns.Lproxy
 ns.AddLocale("en", {
     tab_minimap = "Minimap",
     mm_title = "Minimap Elements",
-    mm_minimapHover = "Also show them when hovering the minimap",
+    mm_minimapHover = "Show them over the minimap",
     mm_zone = "Zone text", mm_clock = "Clock", mm_calendar = "Calendar", mm_tracking = "Tracking",
     mm_mail = "Mail and indicators", mm_addons = "Addon button", mm_border = "Compass border",
     mm_daynight = "Day/night icon", mm_buttons = "Addon minimap buttons",
@@ -29,7 +29,7 @@ ns.AddLocale("en", {
 ns.AddLocale("es", {
     tab_minimap = "Minimapa",
     mm_title = "Elementos del minimapa",
-    mm_minimapHover = "Mostrarlos también al pasar por el minimapa",
+    mm_minimapHover = "Mostrarlos al apuntar al minimapa",
     mm_zone = "Texto de zona", mm_clock = "Reloj", mm_calendar = "Calendario", mm_tracking = "Rastreo",
     mm_mail = "Correo e indicadores", mm_addons = "Botón de addons", mm_border = "Borde de brújula",
     mm_daynight = "Ícono de día/noche", mm_buttons = "Botones de addons",
