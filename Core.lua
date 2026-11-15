@@ -511,6 +511,47 @@ local function CreateBottomButtons(parent, anchorPoint, x, y)
     helpButton:SetScript("OnClick", ns.ShowHelp)
 end
 
+-- Scrolling area for option pages. Returns the frame to build the options
+-- into. Its height is measured from the options it holds (FitContent), so
+-- the scroll bar only scrolls as far as needed. Works with the mouse wheel.
+local function CreateScrollArea(parent, top)
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, parent, "ScrollFrameTemplate")
+    if not ok or not scroll then
+        scroll = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
+    end
+    scroll:SetPoint("TOPLEFT", 0, top)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 6)
+    scroll:EnableMouseWheel(true)
+
+    local content = CreateFrame("Frame", nil, scroll)
+    content:SetSize(400, 1)
+    scroll:SetScrollChild(content)
+    scroll:HookScript("OnSizeChanged", function(self, width)
+        if width and width > 0 then content:SetWidth(width) end
+    end)
+    return content
+end
+
+-- Sets the content's height to reach the lowest option inside it. Options
+-- are placed from the top with fixed offsets, so their offsets and heights
+-- give the total without waiting for the game to lay them out.
+local function FitContent(content)
+    local lowest = 0
+    local function measure(obj)
+        for i = 1, obj:GetNumPoints() do
+            local point, relativeTo, _, _, y = obj:GetPoint(i)
+            if (relativeTo == content or relativeTo == nil) and point and point:find("^TOP") and y then
+                local height = obj.GetStringHeight and obj:GetStringHeight() or obj:GetHeight()
+                local bottom = y - (height or 0)
+                if bottom < lowest then lowest = bottom end
+            end
+        end
+    end
+    for _, child in ipairs({ content:GetChildren() }) do measure(child) end
+    for _, region in ipairs({ content:GetRegions() }) do measure(region) end
+    content:SetHeight(-lowest + 16)
+end
+
 -- General page: modules with an Open button each, fade smoothness,
 -- language and help. "openModule" decides where Open takes you.
 local function BuildGeneral(parent, y, openModule)
@@ -574,8 +615,11 @@ function SelectTab(key)
     if not panes[key] then
         local pane = CreateFrame("Frame", nil, window)
         pane:SetPoint("TOPLEFT", 0, paneTop)
-        pane:SetPoint("BOTTOMRIGHT", 0, 12)
-        paneRefresh[key] = BuildPane(key, pane)
+        pane:SetPoint("BOTTOMRIGHT", 0, 8)
+        local content = CreateScrollArea(pane, 0)
+        local refresh = BuildPane(key, content)
+        FitContent(content)
+        paneRefresh[key] = function() refresh(); FitContent(content) end
         pane:SetScript("OnShow", function() paneRefresh[key]() end)
         panes[key] = pane
     end
@@ -610,7 +654,7 @@ local function CreateWindow()
     end
     local rows = math.ceil(#keys / TABS_PER_ROW)
     paneTop = -36 - rows * 28
-    window:SetHeight(620 + rows * 28)
+    window:SetHeight(520 + rows * 28)
     local width = (WINDOW_WIDTH - 24 - (TABS_PER_ROW - 1) * 4) / TABS_PER_ROW
     for i, item in ipairs(keys) do
         local row = math.floor((i - 1) / TABS_PER_ROW)
@@ -671,20 +715,24 @@ local function RegisterSettings()
             local pageTitle = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             pageTitle:SetPoint("TOPLEFT", 16, -16)
             pageTitle:SetText(L[mod.titleKey])
-            page:SetScript("OnShow", mod.BuildOptions(page, -48))
+            local content = CreateScrollArea(page, -40)
+            local refresh = mod.BuildOptions(content, -8)
+            page:SetScript("OnShow", function() refresh(); FitContent(content) end)
             mod.settingsCategory = Settings.RegisterCanvasLayoutSubcategory(ns.settingsCategory, page, L[mod.titleKey])
         end
     end
 
     -- "Open" goes to the module's sub-page, or to its tab in the window if
     -- sub-pages aren't available.
-    main:SetScript("OnShow", BuildGeneral(main, -72, function(mod)
+    local mainContent = CreateScrollArea(main, -64)
+    local mainRefresh = BuildGeneral(mainContent, -8, function(mod)
         if mod.settingsCategory and Settings.OpenToCategory then
             local ok = pcall(Settings.OpenToCategory, mod.settingsCategory:GetID())
             if ok then return end
         end
         ns.OpenWindow(mod.key)
-    end))
+    end)
+    main:SetScript("OnShow", function() mainRefresh(); FitContent(mainContent) end)
 
     Settings.RegisterAddOnCategory(ns.settingsCategory)
 end

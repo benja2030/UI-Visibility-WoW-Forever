@@ -32,9 +32,10 @@ ns.AddLocale("en", {
     above = "Above the cursor", right = "Right of the cursor", below = "Below the cursor",
     nm_skipPlates = "Skip characters close enough to have a nameplate",
     nm_who = "Show it when hovering:",
-    nm_players = "Players",
-    nm_npcs = "NPCs",
-    nm_enemies = "Enemies",
+    nm_alliedPlayers = "Allied players",
+    nm_enemyPlayers = "Enemy players",
+    nm_friendlyNpcs = "Friendly and neutral NPCs",
+    nm_hostileNpcs = "Hostile NPCs",
     nm_worldOnly = "Only when hovering characters in the world",
     nm_delay = "Name delay",
     nm_tooltipDelay = "Tooltip delay",
@@ -57,9 +58,10 @@ ns.AddLocale("es", {
     above = "Sobre el cursor", right = "A la derecha", below = "Bajo el cursor",
     nm_skipPlates = "Omitir personajes cercanos que ya tienen placa",
     nm_who = "Mostrarlo al apuntar a:",
-    nm_players = "Jugadores",
-    nm_npcs = "PNJ",
-    nm_enemies = "Enemigos",
+    nm_alliedPlayers = "Jugadores aliados",
+    nm_enemyPlayers = "Jugadores enemigos",
+    nm_friendlyNpcs = "PNJ amistosos y neutrales",
+    nm_hostileNpcs = "PNJ hostiles",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
     nm_delay = "Retraso del nombre",
     nm_tooltipDelay = "Retraso del tooltip",
@@ -82,9 +84,10 @@ local mod = {
         size = 20,
         position = "above",
         skipPlates = false,
-        players = true,
-        npcs = true,
-        enemies = true,
+        alliedPlayers = true,
+        enemyPlayers = true,
+        friendlyNpcs = true,
+        hostileNpcs = true,
         worldOnly = true,
         delay = 0,          -- tenths of a second before the name shows
         hideCombat = false,
@@ -136,14 +139,31 @@ local function WantsHovered()
         if inInstance and kind ~= "none" then return false end
     end
     if db.skipPlates and HasNameplate() then return false end
-    if not db.enemies then
-        local canAttack = UnitCanAttack("player", "mouseover")
-        if not ns.IsSecret(canAttack) and canAttack then return false end
-    end
     local isPlayer = UnitIsPlayer("mouseover")
-    if ns.IsSecret(isPlayer) then return db.players or db.npcs end
-    if isPlayer then return db.players end
-    return db.npcs
+    if ns.IsSecret(isPlayer) then
+        return db.alliedPlayers or db.enemyPlayers or db.friendlyNpcs or db.hostileNpcs
+    end
+
+    if isPlayer then
+        -- Players: enemy means the other faction, flagged for PvP or not.
+        local mine = UnitFactionGroup("player")
+        local theirs = UnitFactionGroup("mouseover")
+        local enemy
+        if ns.IsSecret(mine) or ns.IsSecret(theirs) or not mine or not theirs then
+            enemy = UnitIsEnemy("player", "mouseover")
+            if ns.IsSecret(enemy) then return db.alliedPlayers or db.enemyPlayers end
+        else
+            enemy = mine ~= theirs
+        end
+        if enemy then return db.enemyPlayers end
+        return db.alliedPlayers
+    end
+
+    -- NPCs: hostile means you can attack it.
+    local canAttack = UnitCanAttack("player", "mouseover")
+    if ns.IsSecret(canAttack) then return db.friendlyNpcs or db.hostileNpcs end
+    if canAttack then return db.hostileNpcs end
+    return db.friendlyNpcs
 end
 
 ---------------------------------------------------------------------------
@@ -331,6 +351,17 @@ function mod.OnLogin()
         mod.db.savedSize = nil
     end
     mod.db.fallbackAll, mod.db.fallbackSize = nil, nil
+    local db = mod.db
+    if db.players ~= nil or db.npcs ~= nil or db.enemies ~= nil then
+        local players = db.players ~= false
+        local npcs = db.npcs ~= false
+        local enemies = db.enemies ~= false
+        db.alliedPlayers = players
+        db.enemyPlayers = players and enemies
+        db.friendlyNpcs = npcs
+        db.hostileNpcs = npcs and enemies
+        db.players, db.npcs, db.enemies = nil, nil, nil
+    end
 end
 
 function mod.BuildOptions(parent, y)
@@ -364,7 +395,10 @@ function mod.BuildOptions(parent, y)
 
     ns.CreateHeader(parent, L.nm_who, y)
     y = y - 22
-    for _, item in ipairs({ { "nm_players", "players" }, { "nm_npcs", "npcs" }, { "nm_enemies", "enemies" } }) do
+    for _, item in ipairs({
+        { "nm_alliedPlayers", "alliedPlayers" }, { "nm_enemyPlayers", "enemyPlayers" },
+        { "nm_friendlyNpcs", "friendlyNpcs" }, { "nm_hostileNpcs", "hostileNpcs" },
+    }) do
         add(ns.CreateCheck(parent, L[item[1]], y,
             function() return mod.db[item[2]] end, set(item[2])))
         y = y - 28
