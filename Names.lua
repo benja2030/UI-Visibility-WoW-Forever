@@ -1,88 +1,84 @@
 -- UI Visibility: names module
--- Makes the name of the character under the mouse bigger.
+-- Helps read the name of the character under the mouse, at any distance.
 --
--- How it works: names shown by friendly "names only" nameplates are interface
--- text, but the game ignores changes to their size. Addons can hide them,
--- though, and can place their own text on a nameplate. So while the mouse is
--- over a character with a nameplate, the module hides that nameplate's name
--- and draws its own copy in the same place, with the same font and color,
--- only bigger. When the mouse leaves, the copy goes away and the original
--- comes back. Only the hovered name grows.
+-- The names above characters' heads are drawn by the game engine, and addons
+-- can't know where a character's head is on screen. But while you hover a
+-- character, the cursor is on top of it, and addons do know where the cursor
+-- is. So this module offers two things:
+--   * Name at the cursor: a big copy of the hovered character's name, in the
+--     game's name colors, follows the cursor while you hover them.
+--   * Tooltip at the cursor: the tooltip shows up next to the cursor instead
+--     of in the corner, optionally bigger.
 --
--- Characters without a nameplate (for example out of nameplate range, or
--- friendly nameplates turned off) can optionally use the old method: raise
--- the "Minimum character name size" game setting (WorldTextMinSize) while
--- hovering. That one makes every name on screen grow, so it's off by default.
---
--- Safety: when the old method is used, the player's own value is saved and
--- put back on logout, or on the next login if the game closed while raised.
+-- Performance: the name follows the cursor with its own OnUpdate, which only
+-- runs while the name is on screen.
 
 local ADDON_NAME, ns = ...
 local L = ns.Lproxy
 
-local CVAR = "WorldTextMinSize"
-local LINGER = 0.15 -- seconds a name stays big after the mouse leaves
+local LINGER = 0.15 -- seconds the name stays after the mouse leaves
+local POSITIONS = { "above", "right", "below" }
 
 ns.AddLocale("en", {
     tab_names = "Names",
     nm_title = "Character Names",
-    nm_size = "Name size on hover",
-    nm_who = "Grow names when hovering:",
+    nm_cursorName = "Show the hovered character's name at the cursor",
+    nm_size = "Name size",
+    nm_position = "Position",
+    above = "Above the cursor", right = "Right of the cursor", below = "Below the cursor",
+    nm_skipPlates = "Skip characters close enough to have a nameplate",
+    nm_who = "Show it when hovering:",
     nm_players = "Players",
     nm_npcs = "NPCs",
     nm_enemies = "Enemies",
     nm_worldOnly = "Only when hovering characters in the world",
-    nm_fallback = "Without a nameplate, grow every name instead",
-    nm_fallbackSize = "Size for every name",
-    nm_note = "Turn on friendly nameplates (Shift+V) and set them to show names only: then only the hovered name grows. Names without a nameplate stay as they are, unless the option above is on.",
+    nm_tooltipHeader = "Tooltip:",
+    nm_tooltipCursor = "Show the tooltip next to the cursor",
+    nm_tooltipScale = "Tooltip size",
+    nm_note = "The game doesn't let addons know where a character's head is on screen, so the name is shown at the cursor, which is on top of the character you hover.",
     nm_st_disabled = "module disabled",
-    nm_st_plate = "showing %s bigger",
-    nm_st_all = "every name bigger (hovering %s, no nameplate)",
+    nm_st_showing = "showing %s at the cursor",
     nm_st_idle = "waiting for the mouse",
-    nm_noCVar = "this game version doesn't have the WorldTextMinSize setting, so \"grow every name\" can't work.",
 })
 ns.AddLocale("es", {
     tab_names = "Nombres",
     nm_title = "Nombres de personajes",
-    nm_size = "Tamaño al pasar el mouse",
-    nm_who = "Agrandar el nombre al apuntar a:",
+    nm_cursorName = "Mostrar el nombre del personaje apuntado junto al cursor",
+    nm_size = "Tamaño del nombre",
+    nm_position = "Posición",
+    above = "Sobre el cursor", right = "A la derecha", below = "Bajo el cursor",
+    nm_skipPlates = "Omitir personajes cercanos que ya tienen placa",
+    nm_who = "Mostrarlo al apuntar a:",
     nm_players = "Jugadores",
     nm_npcs = "PNJ",
     nm_enemies = "Enemigos",
     nm_worldOnly = "Solo al apuntar personajes en el mundo",
-    nm_fallback = "Sin placa, agrandar todos los nombres",
-    nm_fallbackSize = "Tamaño para todos los nombres",
-    nm_note = "Activa las placas aliadas (Shift+V) y configúralas para mostrar solo nombres: así crece solo el nombre que apuntas. Los nombres sin placa quedan igual, salvo que actives la opción de arriba.",
+    nm_tooltipHeader = "Tooltip:",
+    nm_tooltipCursor = "Mostrar el tooltip junto al cursor",
+    nm_tooltipScale = "Tamaño del tooltip",
+    nm_note = "El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre se muestra junto al cursor, que está sobre el personaje que apuntas.",
     nm_st_disabled = "módulo desactivado",
-    nm_st_plate = "mostrando a %s más grande",
-    nm_st_all = "todos los nombres grandes (apuntando a %s, sin placa)",
+    nm_st_showing = "mostrando a %s junto al cursor",
     nm_st_idle = "esperando el mouse",
-    nm_noCVar = "esta versión del juego no tiene el ajuste WorldTextMinSize, así que \"agrandar todos los nombres\" no puede funcionar.",
 })
 
 local mod = {
     key = "names", titleKey = "nm_title", tabKey = "tab_names",
     defaults = {
         enabled = true,
-        size = 18,
+        cursorName = true,
+        size = 20,
+        position = "above",
+        skipPlates = false,
         players = true,
         npcs = true,
         enemies = true,
         worldOnly = true,
-        fallbackAll = false,
-        fallbackSize = 24,
-        savedSize = nil, -- the player's own WorldTextMinSize while raised
+        tooltipCursor = false,
+        tooltipScale = 100,
     },
 }
 ns.RegisterModule(mod)
-
-local cvarAvailable = false
-
--- State of the current hover.
-local activeName      -- the nameplate's original name text
-local activeMode      -- "plate", "all" or nil
-local hoveredLabel = ""
-local hoverUntil = 0
 
 ---------------------------------------------------------------------------
 -- Helpers
@@ -107,12 +103,18 @@ local function MouseOverWorld()
     return not ok or result
 end
 
--- True if the character under the mouse passes the filters.
+local function HasNameplate()
+    local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, "mouseover")
+    return ok and plate ~= nil
+end
+
+-- True if the character under the mouse should get the name at the cursor.
 local function WantsHovered()
     local db = mod.db
     if not Yes(UnitExists("mouseover")) then return false end
     if Yes(UnitIsUnit("mouseover", "player")) then return false end
     if db.worldOnly and not MouseOverWorld() then return false end
+    if db.skipPlates and HasNameplate() then return false end
     if not db.enemies then
         local canAttack = UnitCanAttack("player", "mouseover")
         if not ns.IsSecret(canAttack) and canAttack then return false end
@@ -123,191 +125,166 @@ local function WantsHovered()
     return db.npcs
 end
 
--- The name text of the hovered character's nameplate, or nil.
-local function HoveredPlateName()
-    local ok, name = pcall(function()
-        local plate = C_NamePlate.GetNamePlateForUnit("mouseover")
-        if not plate or (plate.IsForbidden and plate:IsForbidden()) then return nil end
-        local frame = plate.UnitFrame
-        local text = frame and (frame.name
-            or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar
-                and frame.HealthBarsContainer.healthBar.unitNameFontString))
-        if not text or (text.IsForbidden and text:IsForbidden()) then return nil end
-        local shown = text:IsShown()
-        if ns.IsSecret(shown) or not shown then return nil end
-        return text
-    end)
-    if ok then return name end
-    return nil
-end
-
 ---------------------------------------------------------------------------
--- Bigger copy of a nameplate name
+-- Name at the cursor
 ---------------------------------------------------------------------------
--- The copy lives on its own frame, low in the drawing order, so windows and
--- bars still cover it like they cover nameplates.
-local holder = CreateFrame("Frame", nil, UIParent)
-holder:SetFrameStrata("BACKGROUND")
-holder:SetAllPoints(UIParent)
-local copy = holder:CreateFontString(nil, "OVERLAY")
-copy:Hide()
+local label = CreateFrame("Frame", nil, UIParent)
+label:SetFrameStrata("TOOLTIP")
+label:SetSize(1, 1)
+label:SetAlpha(0)
+label:Hide()
+local text = label:CreateFontString(nil, "OVERLAY")
 
-local function ShowCopy(original)
-    local font, _, flags = original:GetFont()
-    if ns.IsSecret(font) or not font then font = STANDARD_TEXT_FONT end
-    -- Keep the outline, drop flags addons can't use (like SLUG).
-    local outline = "OUTLINE"
-    if not ns.IsSecret(flags) and type(flags) == "string" and flags:find("THICK") then
-        outline = "THICKOUTLINE"
-    end
-    if not copy:SetFont(font, mod.db.size, outline) then
-        copy:SetFont(STANDARD_TEXT_FONT, mod.db.size, outline)
-    end
-    copy:SetShadowOffset(1, -1)
-    copy:SetShadowColor(0, 0, 0, 1)
+local OFFSETS = {
+    above = { "BOTTOM", 0, 24 },
+    right = { "LEFT", 28, 0 },
+    below = { "TOP", 0, -32 },
+}
 
-    local r, g, b = original:GetTextColor()
-    if ns.IsSecret(r) or ns.IsSecret(g) or ns.IsSecret(b) or not r then r, g, b = 1, 1, 1 end
-    copy:SetTextColor(r, g, b)
-
-    local text = original:GetText()
-    if ns.IsSecret(text) then
-        -- Can't be read, but it can still be displayed.
-        pcall(copy.SetText, copy, text)
-    else
-        copy:SetText(text or "")
-    end
-
-    -- Bottom to bottom: the bigger name grows upward, away from the head.
-    copy:ClearAllPoints()
-    copy:SetPoint("BOTTOM", original, "BOTTOM", 0, 0)
-    copy:Show()
-    original:SetAlpha(0)
+local function PlaceText()
+    local o = OFFSETS[mod.db.position] or OFFSETS.above
+    text:ClearAllPoints()
+    text:SetPoint(o[1], label, "CENTER", o[2], o[3])
 end
 
-local function HideCopy()
-    copy:Hide()
-    if activeName then pcall(activeName.SetAlpha, activeName, 1) end
+local function ApplyFont()
+    local font = UNIT_NAME_FONT or STANDARD_TEXT_FONT
+    if not text:SetFont(font, mod.db.size, "OUTLINE") then
+        text:SetFont(STANDARD_TEXT_FONT, mod.db.size, "OUTLINE")
+    end
+    text:SetShadowOffset(1, -1)
+    text:SetShadowColor(0, 0, 0, 1)
+    PlaceText()
 end
 
----------------------------------------------------------------------------
--- "Every name" fallback (WorldTextMinSize)
----------------------------------------------------------------------------
-local function SetMinSize(value)
-    pcall(SetCVar, CVAR, tostring(value))
-end
-
-local function RaiseAll()
-    if not cvarAvailable then return false end
-    if mod.db.savedSize == nil then
-        mod.db.savedSize = tonumber(GetCVar(CVAR)) or 0
-    end
-    if mod.db.fallbackSize > mod.db.savedSize then SetMinSize(mod.db.fallbackSize) end
-    return true
-end
-
-local function RestoreAll()
-    if mod.db.savedSize ~= nil then
-        SetMinSize(mod.db.savedSize)
-        mod.db.savedSize = nil
-    end
-end
-
----------------------------------------------------------------------------
--- Update
----------------------------------------------------------------------------
-local function Stop()
-    if activeMode == "plate" then HideCopy() end
-    if activeMode == "all" then RestoreAll() end
-    activeName, activeMode = nil, nil
-end
-mod.Stop = Stop
-
-function mod.OnTick(now)
-    if not mod.db.enabled then
-        if activeMode then Stop() end
-        return
-    end
-
-    if not WantsHovered() then
-        if activeMode and now >= hoverUntil then Stop() end
-        return
-    end
-    hoverUntil = now + LINGER
-
-    local plateName = HoveredPlateName()
-    if plateName then
-        if activeMode == "plate" and activeName == plateName then
-            -- Same character: keep the original hidden in case the game
-            -- showed it again.
-            if plateName:GetAlpha() ~= 0 then plateName:SetAlpha(0) end
-            return
-        end
-        Stop()
-        activeName, activeMode = plateName, "plate"
-        local label = UnitName("mouseover")
-        hoveredLabel = (not ns.IsSecret(label) and label) or "?"
-        ShowCopy(plateName)
-        return
-    end
-
-    -- No nameplate for this character.
-    if mod.db.fallbackAll then
-        if activeMode ~= "all" then
-            Stop()
-            if RaiseAll() then
-                activeMode = "all"
-                local label = UnitName("mouseover")
-                hoveredLabel = (not ns.IsSecret(label) and label) or "?"
-            end
-        end
-    elseif activeMode then
-        Stop()
-    end
-end
-
-function mod.SetEnabled(v)
-    mod.db.enabled = v
-    if not v then Stop() end
-end
-
--- A nameplate given to another character: drop the copy at once.
-local events = CreateFrame("Frame")
-events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
-events:RegisterEvent("PLAYER_LOGOUT")
-events:SetScript("OnEvent", function(self, event)
-    if event == "PLAYER_LOGOUT" then
-        if mod.db then RestoreAll() end
-        return
-    end
-    if activeMode == "plate" then Stop() end
+-- Follows the cursor every frame while the name is on screen.
+label:SetScript("OnUpdate", function(self)
+    local x, y = GetCursorPosition()
+    local scale = UIParent:GetEffectiveScale()
+    self:ClearAllPoints()
+    self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
 end)
 
-function mod.OnLogin()
-    cvarAvailable = GetCVar(CVAR) ~= nil
-    -- The game closed while every name was raised: put the value back.
-    if mod.db.savedSize ~= nil then
-        if cvarAvailable then SetMinSize(mod.db.savedSize) end
-        mod.db.savedSize = nil
+local showing = false
+local hoverUntil = 0
+local hoveredName = ""
+
+-- Name and color the game uses for the hovered character.
+local function SetFromMouseover()
+    local name = UnitName("mouseover")
+    if ns.IsSecret(name) then
+        pcall(text.SetText, text, name) -- can't be read, but can be shown
+        hoveredName = "?"
+    else
+        text:SetText(name or "")
+        hoveredName = name or "?"
+    end
+    local ok, r, g, b = pcall(UnitSelectionColor, "mouseover")
+    if not ok or ns.IsSecret(r) or ns.IsSecret(g) or ns.IsSecret(b) or not r then
+        r, g, b = 1, 0.82, 0
+    end
+    text:SetTextColor(r, g, b)
+end
+
+local lastGUID
+
+function mod.OnTick(now)
+    local db = mod.db
+    local want = db.enabled and db.cursorName and WantsHovered()
+    if want then
+        hoverUntil = now + LINGER
+        local guid = UnitGUID("mouseover")
+        if ns.IsSecret(guid) then guid = nil end
+        if not showing or guid ~= lastGUID or guid == nil then
+            SetFromMouseover()
+            lastGUID = guid
+        end
+        if not showing then
+            showing = true
+            label:Show()
+        end
+    elseif showing and now >= hoverUntil then
+        showing = false
+        lastGUID = nil
+    end
+
+    -- Fade in and out with the addon's fade smoothness.
+    if label:IsShown() then
+        local busy = ns.Fade(label, showing and 1 or 0)
+        if not showing and not busy then label:Hide() end
     end
 end
 
 ---------------------------------------------------------------------------
--- Options and status
+-- Tooltip at the cursor
 ---------------------------------------------------------------------------
+-- The game calls GameTooltip_SetDefaultAnchor for tooltips that would go to
+-- the corner (world objects, characters and many buttons). Right after it,
+-- the tooltip is moved next to the cursor and scaled.
+local tooltipHooked = false
+
+local function HookTooltip()
+    if tooltipHooked or not GameTooltip_SetDefaultAnchor then return end
+    tooltipHooked = true
+    hooksecurefunc("GameTooltip_SetDefaultAnchor", function(tooltip, parent)
+        if tooltip ~= GameTooltip then return end
+        local db = mod.db
+        if not (db and db.enabled) then return end
+        if db.tooltipCursor then
+            pcall(tooltip.SetOwner, tooltip, parent, "ANCHOR_CURSOR_RIGHT", 24, 8)
+        end
+        if db.tooltipScale ~= 100 then
+            tooltip:SetScale(db.tooltipScale / 100)
+        end
+    end)
+    -- Other tooltips (items, spells) keep their normal size.
+    GameTooltip:HookScript("OnHide", function(self)
+        if self:GetScale() ~= 1 then self:SetScale(1) end
+    end)
+end
+
+---------------------------------------------------------------------------
+-- Module hooks
+---------------------------------------------------------------------------
+function mod.SetEnabled(v)
+    mod.db.enabled = v
+end
+
+function mod.OnLogin()
+    ApplyFont()
+    HookTooltip()
+    -- Earlier versions could leave the minimum name size raised.
+    if mod.db.savedSize ~= nil then
+        pcall(SetCVar, "WorldTextMinSize", tostring(mod.db.savedSize))
+        mod.db.savedSize = nil
+    end
+    mod.db.fallbackAll, mod.db.fallbackSize = nil, nil
+end
+
 function mod.BuildOptions(parent, y)
     local refreshers = {}
     local function add(r) refreshers[#refreshers + 1] = r end
-    local function set(key) return function(v) mod.db[key] = v; Stop() end end
+    local function set(key) return function(v) mod.db[key] = v end end
 
     add(ns.CreateCheck(parent, L.enabled, y,
         function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
     y = y - 36
 
+    add(ns.CreateCheck(parent, L.nm_cursorName, y,
+        function() return mod.db.cursorName end, set("cursorName")))
+    y = y - 34
     add(ns.CreateSlider(parent, L.nm_size, y,
-        function() return mod.db.size end, set("size"), 10, 40,
+        function() return mod.db.size end,
+        function(v) mod.db.size = v; ApplyFont() end, 10, 40,
         function(v) return tostring(math.floor(v + 0.5)) end))
-    y = y - 36
+    y = y - 32
+    add(ns.CreateCycle(parent, L.nm_position, y, POSITIONS,
+        function() return mod.db.position end,
+        function(v) mod.db.position = v; PlaceText() end))
+    y = y - 32
+    add(ns.CreateCheck(parent, L.nm_skipPlates, y,
+        function() return mod.db.skipPlates end, set("skipPlates")))
+    y = y - 34
 
     ns.CreateHeader(parent, L.nm_who, y)
     y = y - 22
@@ -316,17 +293,18 @@ function mod.BuildOptions(parent, y)
             function() return mod.db[item[2]] end, set(item[2])))
         y = y - 28
     end
-    y = y - 8
     add(ns.CreateCheck(parent, L.nm_worldOnly, y,
         function() return mod.db.worldOnly end, set("worldOnly")))
-    y = y - 36
+    y = y - 38
 
-    add(ns.CreateCheck(parent, L.nm_fallback, y,
-        function() return mod.db.fallbackAll end, set("fallbackAll")))
+    ns.CreateHeader(parent, L.nm_tooltipHeader, y)
+    y = y - 22
+    add(ns.CreateCheck(parent, L.nm_tooltipCursor, y,
+        function() return mod.db.tooltipCursor end, set("tooltipCursor")))
     y = y - 32
-    add(ns.CreateSlider(parent, L.nm_fallbackSize, y,
-        function() return mod.db.fallbackSize end, set("fallbackSize"), 1, 64,
-        function(v) return tostring(math.floor(v + 0.5)) end))
+    add(ns.CreateSlider(parent, L.nm_tooltipScale, y,
+        function() return mod.db.tooltipScale end, set("tooltipScale"), 50, 200,
+        function(v) return math.floor(v + 0.5) .. "%" end))
     y = y - 40
     ns.CreateNote(parent, L.nm_note, y)
 
@@ -337,13 +315,10 @@ function mod.PrintStatus()
     local state
     if not mod.db.enabled then
         state = L.nm_st_disabled
-    elseif activeMode == "plate" then
-        state = string.format(L.nm_st_plate, hoveredLabel)
-    elseif activeMode == "all" then
-        state = string.format(L.nm_st_all, hoveredLabel)
+    elseif showing then
+        state = string.format(L.nm_st_showing, hoveredName)
     else
         state = L.nm_st_idle
     end
     ns.Print(L.nm_title .. ": " .. state)
-    if mod.db.fallbackAll and not cvarAvailable then ns.Print(L.nm_noCVar) end
 end
