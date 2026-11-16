@@ -560,16 +560,19 @@ local CATEGORY_SETTING = { herb = "objHerbs", ore = "objOre", other = "objOther"
 
 -- True if the object under the mouse should get its name at the cursor.
 -- The game fades an object's tooltip out slowly after the mouse leaves it,
--- so the tooltip being shown doesn't mean the object is still there. While
--- an object's name is up, what's under the cursor is checked often, and the
--- name goes as soon as the object isn't under it.
+-- so the tooltip being shown doesn't mean the object is still there. While a
+-- gathering node's name is up (herbs and ore), what's under the cursor is
+-- checked often, and the name goes as soon as the node isn't under it. Other
+-- objects keep their name until their tooltip is gone.
 local LOOK_EVERY = 0.1
+local QUICK_CATEGORIES = { herb = true, ore = true }
 
 local function WantsObject()
     local db = mod.db
     if not GameTooltip:IsShown() or Yes(UnitExists("mouseover")) then return false end
     local canLook = C_TooltipInfo and C_TooltipInfo.GetWorldCursor
-    if canLook and (hoveredObject or not listening) and GetTime() >= nextLook then
+    local quick = hoveredObject and QUICK_CATEGORIES[hoveredObject.category]
+    if canLook and (quick or not listening) and GetTime() >= nextLook then
         nextLook = GetTime() + LOOK_EVERY
         local ok, data = pcall(C_TooltipInfo.GetWorldCursor)
         if ok and data and data.type == OBJECT_TYPE then
