@@ -52,6 +52,14 @@ ns.AddLocale("en", {
     nm_questMark_tip = "Shows a ! before the name when the character is part of one of your active quests.",
 
     nm_secWho = "Show for",
+    nm_secObjects = "Objects",
+    nm_objectsNote = "Things you hover in the world that aren't characters, like herbs and ore veins. Their name comes from the game's tooltip.",
+    nm_objHerbs = "Herbs",
+    nm_objHerbs_tip = "Plants you gather with Herbalism.",
+    nm_objOre = "Mining nodes",
+    nm_objOre_tip = "Veins and deposits you gather with Mining.",
+    nm_objOther = "Other objects",
+    nm_objOther_tip = "Chests, fishing pools, mailboxes, doors and anything else in the world with a tooltip.",
     nm_alliedPlayers = "Allied players",
     nm_enemyPlayers = "Enemy players",
     nm_enemyPlayers_tip = "Players of the other faction, flagged for PvP or not.",
@@ -170,6 +178,14 @@ ns.AddLocale("es", {
     nm_questMark_tip = "Muestra un ! antes del nombre cuando el personaje es parte de una de tus misiones activas.",
 
     nm_secWho = "Mostrar para",
+    nm_secObjects = "Objetos",
+    nm_objectsNote = "Cosas del mundo que no son personajes, como hierbas y vetas de mineral. Su nombre sale del tooltip del juego.",
+    nm_objHerbs = "Hierbas",
+    nm_objHerbs_tip = "Plantas que se recogen con Herboristería.",
+    nm_objOre = "Vetas de mineral",
+    nm_objOre_tip = "Vetas y depósitos que se recogen con Minería.",
+    nm_objOther = "Otros objetos",
+    nm_objOther_tip = "Cofres, bancos de peces, buzones, puertas y cualquier otra cosa del mundo con tooltip.",
     nm_alliedPlayers = "Jugadores aliados",
     nm_enemyPlayers = "Jugadores enemigos",
     nm_enemyPlayers_tip = "Jugadores de la otra facción, con o sin JcJ activado.",
@@ -283,6 +299,9 @@ local mod = {
         enemyPlayers = true,
         friendlyNpcs = true,
         hostileNpcs = true,
+        objHerbs = true,
+        objOre = true,
+        objOther = false,
         worldOnly = true,
         delay = 0,          -- tenths of a second before the name shows
         hideCombat = false,
@@ -479,6 +498,94 @@ local function LevelText()
     return string.format("|cff%02x%02x%02x(%s)|r", r * 255, g * 255, b * 255, label)
 end
 
+---------------------------------------------------------------------------
+-- Objects in the world (herbs, ore veins, chests...)
+---------------------------------------------------------------------------
+-- They aren't characters, so there's no "mouseover" for them, but the game
+-- fills its tooltip with their data: the name on the first line and, for
+-- gathering nodes, the profession on another line ("Mining", "Herbalism").
+-- That data is read each time the tooltip is filled for an object, and the
+-- profession line decides the category.
+local PROFESSION_WORDS = {
+    herb = { "herbalism", "herboristería", "herborismo", "herboristerie", "kräuterkunde",
+             "травничество", "약초 채집", "草药学", "草藥學" },
+    ore  = { "mining", "minería", "mineração", "minage", "bergbau",
+             "горное дело", "채광", "采矿", "採礦" },
+}
+
+local hoveredObject -- { name, category, r, g, b } while the tooltip shows one
+
+local function ObjectCategory(lines)
+    for i = 2, #lines do
+        local text = lines[i].leftText
+        if type(text) == "string" and not ns.IsSecret(text) then
+            text = text:lower()
+            for category, words in pairs(PROFESSION_WORDS) do
+                for _, word in ipairs(words) do
+                    if text:find(word, 1, true) then return category end
+                end
+            end
+        end
+    end
+    return "other"
+end
+
+local function RecordObject(data)
+    hoveredObject = nil
+    local lines = data and data.lines
+    local first = lines and lines[1]
+    local name = first and first.leftText
+    if type(name) ~= "string" or ns.IsSecret(name) or name == "" then return end
+    local r, g, b = 1, 1, 1
+    local color = first.leftColor
+    if color and color.r and not ns.IsSecret(color.r) then r, g, b = color.r, color.g, color.b end
+    hoveredObject = { name = name, category = ObjectCategory(lines), r = r, g = g, b = b }
+end
+
+local OBJECT_TYPE = (Enum and Enum.TooltipDataType and Enum.TooltipDataType.Object) or 4
+
+-- Best way: the game tells addons each time it fills a tooltip with data.
+-- If this version can't, the data under the cursor is read a few times a
+-- second while the tooltip shows (see WantsObject).
+local listening = false
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
+    listening = pcall(TooltipDataProcessor.AddTooltipPostCall, OBJECT_TYPE, function(tooltip, data)
+        if tooltip == GameTooltip then RecordObject(data) end
+    end)
+end
+local nextLook = 0
+GameTooltip:HookScript("OnHide", function() hoveredObject = nil end)
+
+local CATEGORY_SETTING = { herb = "objHerbs", ore = "objOre", other = "objOther" }
+
+-- True if the object under the mouse should get its name at the cursor.
+local function WantsObject()
+    local db = mod.db
+    if not GameTooltip:IsShown() or Yes(UnitExists("mouseover")) then return false end
+    if not listening and C_TooltipInfo and C_TooltipInfo.GetWorldCursor and GetTime() >= nextLook then
+        nextLook = GetTime() + 0.25
+        local ok, data = pcall(C_TooltipInfo.GetWorldCursor)
+        if ok and data and data.type == OBJECT_TYPE then RecordObject(data) else hoveredObject = nil end
+    end
+    if not hoveredObject then return false end
+    if not db[CATEGORY_SETTING[hoveredObject.category]] then return false end
+    if not MouseOverWorld() then return false end
+    if db.hideCombat and (InCombatLockdown() or Yes(UnitAffectingCombat("player"))) then return false end
+    if db.hideInstances then
+        local inInstance, kind = IsInInstance()
+        if inInstance and kind ~= "none" then return false end
+    end
+    return true
+end
+
+local function SetFromObject()
+    local o = hoveredObject
+    text:SetText(o.name)
+    text:SetTextColor(o.r, o.g, o.b)
+    mark:Hide()
+    hoveredName = o.name
+end
+
 local function SetFromMouseover()
     local name = UnitName("mouseover")
     if ns.IsSecret(name) then
@@ -517,16 +624,26 @@ function mod.OnTick(now)
     UpdateToggleButton(now)
     UpdateAutoRules(now)
     local db = mod.db
-    local want = db.enabled and db.cursorName and WantsHovered()
+    -- What's under the mouse: a character first, otherwise an object.
+    local key, fill
+    if db.enabled and db.cursorName then
+        if WantsHovered() then
+            local guid = UnitGUID("mouseover")
+            if ns.IsSecret(guid) then guid = nil end
+            key, fill = guid or "unit", SetFromMouseover
+            if guid == nil then lastGUID = nil end -- can't tell characters apart: refresh every time
+        elseif WantsObject() then
+            key, fill = "object:" .. hoveredObject.name, SetFromObject
+        end
+    end
+    local want = key ~= nil
     if want then
         hoverStart = hoverStart or now
         if not showing and now - hoverStart < db.delay / 10 then return end
         hoverUntil = now + LINGER
-        local guid = UnitGUID("mouseover")
-        if ns.IsSecret(guid) then guid = nil end
-        if not showing or guid ~= lastGUID or guid == nil then
-            SetFromMouseover()
-            lastGUID = guid
+        if not showing or key ~= lastGUID then
+            fill()
+            lastGUID = key
         end
         if not showing then
             showing = true
@@ -1177,6 +1294,20 @@ function mod.BuildOptions(parent, y)
                   enabledIf = nameOn }))
         end
         y = y - 28
+    end
+    y = y - 12
+
+    -- Objects
+    ns.CreateSection(parent, L.nm_secObjects, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.nm_objectsNote, y) - 12
+    for i, key in ipairs({ "objHerbs", "objOre", "objOther" }) do
+        local col = (i - 1) % 2
+        add(ns.CreateCheck(parent, L["nm_" .. key], y,
+            function() return db()[key] end, set(key),
+            { x = col == 0 and COL1 or COL2, width = WIDTH,
+              tooltip = L["nm_" .. key .. "_tip"], enabledIf = nameOn }))
+        if col == 1 or i == 3 then y = y - 28 end
     end
     y = y - 12
 
