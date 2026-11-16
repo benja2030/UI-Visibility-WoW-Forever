@@ -559,13 +559,24 @@ GameTooltip:HookScript("OnHide", function() hoveredObject = nil end)
 local CATEGORY_SETTING = { herb = "objHerbs", ore = "objOre", other = "objOther" }
 
 -- True if the object under the mouse should get its name at the cursor.
+-- The game fades an object's tooltip out slowly after the mouse leaves it,
+-- so the tooltip being shown doesn't mean the object is still there. While
+-- an object's name is up, what's under the cursor is checked often, and the
+-- name goes as soon as the object isn't under it.
+local LOOK_EVERY = 0.1
+
 local function WantsObject()
     local db = mod.db
     if not GameTooltip:IsShown() or Yes(UnitExists("mouseover")) then return false end
-    if not listening and C_TooltipInfo and C_TooltipInfo.GetWorldCursor and GetTime() >= nextLook then
-        nextLook = GetTime() + 0.25
+    local canLook = C_TooltipInfo and C_TooltipInfo.GetWorldCursor
+    if canLook and (hoveredObject or not listening) and GetTime() >= nextLook then
+        nextLook = GetTime() + LOOK_EVERY
         local ok, data = pcall(C_TooltipInfo.GetWorldCursor)
-        if ok and data and data.type == OBJECT_TYPE then RecordObject(data) else hoveredObject = nil end
+        if ok and data and data.type == OBJECT_TYPE then
+            if not listening or not hoveredObject then RecordObject(data) end
+        else
+            hoveredObject = nil
+        end
     end
     if not hoveredObject then return false end
     if not db[CATEGORY_SETTING[hoveredObject.category]] then return false end
