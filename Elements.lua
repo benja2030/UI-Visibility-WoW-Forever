@@ -851,6 +851,10 @@ function ns.NewElementsModule(cfg)
             function() return mod.db.blockClicks end, function(v) mod.db.blockClicks = v; dirty = true end,
             { tooltip = L.blockClicks_tip, width = 360 }))
         y = y - 28
+        -- Options of one module only (cfg.extraOptions returns the new y).
+        if cfg.extraOptions then
+            y = cfg.extraOptions(parent, y, add, function() dirty = true end)
+        end
         if cfg.minimapHover then
             add(ns.CreateCheck(parent, L[cfg.minimapHoverLabel], y,
                 function() return mod.db.minimapHover end, function(v) mod.db.minimapHover = v; dirty = true end,

@@ -48,6 +48,8 @@ In the Action bars, Class bars, Unit frames, Interface and Minimap modules, ever
 
 Settings from older versions are kept: **On hover** is now Show when with **Mouse over it** ticked.
 
+**Glowing buttons hide with their bar** (Action bars, on by default): some addons, like Glowing Bars, make glowing buttons ignore their bar's opacity so they always show. With this on, buttons on bars that UI Visibility hides or fades follow their bar, glow included. Bars set to Shown aren't affected.
+
 ### Hover groups
 
 Each module has **Show hover elements together**, but only for its own elements. **Hover groups** do the same across modules: put elements from any of the five modules above, or the Personal Resource Display, in a group (for example Action Bar 1, the player frame and the bags), and hovering any of them shows every element of the group that has **Mouse over it** ticked. There are four groups.
@@ -172,6 +174,8 @@ En los módulos de barras de acción, barras de clase, marcos de unidad, interfa
   - En combate, el juego no deja que los addons cambien qué se puede clickear, así que se decide al empezar el combate: lo que se ve en ese momento (o aparece por estar en combate) se puede clickear. Con **No clickear elementos invisibles en combate** (activado por defecto), lo que esté invisible al empezar el combate no se puede clickear hasta que termine, aunque aparezca con el mouse. Desactívalo para poder clickearlos durante el combate.
 
 Se mantiene la configuración de versiones anteriores: **Con el mouse** ahora es Mostrar cuando con **Mouse encima** marcado.
+
+**Los botones brillantes se ocultan con su barra** (Barras de acción, activado por defecto): algunos addons, como Glowing Bars, hacen que los botones que brillan ignoren la opacidad de su barra para verse siempre. Con esto activado, los botones de barras que UI Visibility oculta o desvanece siguen a su barra, brillo incluido. Las barras en Visible no se ven afectadas.
 
 ### Grupos al apuntar
 
