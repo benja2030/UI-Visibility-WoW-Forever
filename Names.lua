@@ -35,9 +35,10 @@ ns.AddLocale("en", {
     nm_title = "Character Names",
 
     nm_secName = "Name at the cursor",
-    nm_nameNote = "While you hover a player or NPC, their name appears in big letters next to the cursor, so you can read it at any distance.",
-    nm_quickNote = "Hides every name above heads at once, and brings them back exactly as they were.",
-    nm_tooltipSecNote = "Changes the game's tooltip, the box with information that appears when you hover something.",
+    nm_withName = "Next to the name",
+    nm_nameNote = "The name of the player or NPC you hover, in big letters next to the cursor.",
+    nm_quickNote = "Hides every name above heads at once, and brings them back as they were.",
+    nm_tooltipSecNote = "The game's box with information when you hover something.",
     nm_cursorName = "Show name",
     nm_cursorName_tip = "Shows the hovered character's name in big letters next to the cursor.",
     nm_size = "Size",
@@ -48,12 +49,16 @@ ns.AddLocale("en", {
     nm_showLevel_tip = "Shows the level after the name, like (32). Elites get a +, and (??) means too high to see.",
     nm_levelColor = "Difficulty colors",
     nm_levelColor_tip = "Colors the level by how hard the character is for you. Off: the level uses the name's color.",
+    nm_npcLevel = "Show on friendly NPCs",
+    nm_npcLevel_tip = "Off: friendly NPCs (vendors, trainers, guards...) show their name without the level. Players and enemies keep it.",
+    nm_npcTitle = "Title of friendly NPCs",
+    nm_npcTitle_tip = "Shows the title of friendly NPCs under their name, like <Food & Drink Vendor>. It's read from the game's tooltip data.",
     nm_questMark = "Quest mark",
     nm_questMark_tip = "Shows a ! before the name when the character is part of one of your active quests.",
 
-    nm_secWho = "Show for",
+    nm_secWho = "Show the name for",
     nm_secObjects = "Objects",
-    nm_objectsNote = "Things you hover in the world that aren't characters, like herbs and ore veins. Their name comes from the game's tooltip.",
+    nm_objectsNote = "Things in the world that aren't characters.",
     nm_objHerbs = "Herbs",
     nm_objHerbs_tip = "Plants you gather with Herbalism.",
     nm_objOre = "Mining nodes",
@@ -68,7 +73,7 @@ ns.AddLocale("en", {
     nm_hostileNpcs = "Hostile NPCs",
     nm_hostileNpcs_tip = "NPCs you can attack.",
 
-    nm_secHide = "Hide when",
+    nm_secHide = "Hide the name when",
     nm_hideCombat = "In combat",
     nm_hideInstances = "In an instance",
     nm_hideInstances_tip = "Dungeons, raids and battlegrounds.",
@@ -80,7 +85,7 @@ ns.AddLocale("en", {
     nm_worldOnly_tip = "The mouse is over an interface frame (like the party or target frame) instead of the world.",
 
     nm_secWorld = "Names above heads",
-    nm_worldNote = "These are the game's own settings, so they also change in the game's options. Hover each one for details.",
+    nm_worldNote = "The game's own settings. Hover each one for details.",
     nm_wAlliedPlayers = "Allied players",
     nm_wEnemyPlayers = "Enemy players",
     nm_wHostileNpcs = "Hostile NPCs",
@@ -123,7 +128,7 @@ ns.AddLocale("en", {
     target_names = "Names only",
     target_all = "Names and interface",
     nm_secAuto = "Hide automatically",
-    nm_autoNote = "Hides the same things as the quick toggle, and brings them back on their own when the reason ends. It never undoes something you hid yourself.",
+    nm_autoNote = "Hides the same as the quick toggle, and brings it back when the reason ends.",
     nm_autoAfk = "While you're away",
     nm_autoAfk_tip = "Hides when you go <Away>, and shows again when you come back.",
     nm_autoIdle = "After time out of combat",
@@ -136,7 +141,7 @@ ns.AddLocale("en", {
     nm_combatBlocked = "the interface can't be hidden or shown during combat. Try again after the fight, or press Alt+Z.",
     style_eye = "Simple eye",
     style_spell = "Game icon",
-    nm_buttonIdle = "Opacity away",
+    nm_buttonIdle = "Opacity when not hovered",
     nm_buttonIdle_tip = "In On hover mode, the button's opacity while the mouse isn't over it. 0% makes it invisible until you hover where it is.",
     nm_buttonSize = "Button size",
     nm_resetPos = "Reset position",
@@ -149,9 +154,9 @@ ns.AddLocale("en", {
     nm_tooltipCursor_tip = "Shows the tooltip next to the cursor instead of in the corner of the screen.",
     nm_tooltipScale = "Size",
     nm_tooltipDelay = "Delay",
-    nm_tooltipNote = "The delay only applies to characters and objects in the world, not to buttons or windows.",
+    nm_tooltipNote = "The delay only applies to things in the world, not to buttons or windows.",
 
-    nm_note = "The game doesn't let addons know where a character's head is on screen, so the name follows the cursor instead.",
+    nm_note = "Addons can't know where a head is on screen, so the name follows the cursor.",
     nm_st_disabled = "module disabled",
     nm_st_showing = "showing %s at the cursor",
     nm_st_idle = "waiting for the mouse",
@@ -161,9 +166,9 @@ ns.AddLocale("es", {
     nm_title = "Nombres de personajes",
 
     nm_secName = "Nombre junto al cursor",
-    nm_nameNote = "Mientras apuntas a un jugador o PNJ, su nombre aparece en grande junto al cursor, para que puedas leerlo a cualquier distancia.",
-    nm_quickNote = "Oculta todos los nombres sobre la cabeza a la vez, y los vuelve a mostrar exactamente como estaban.",
-    nm_tooltipSecNote = "Cambia el tooltip del juego, el recuadro con información que aparece al pasar el mouse sobre algo.",
+    nm_nameNote = "El nombre del jugador o PNJ que apuntas, en grande junto al cursor.",
+    nm_quickNote = "Oculta todos los nombres sobre la cabeza a la vez, y los devuelve como estaban.",
+    nm_tooltipSecNote = "El recuadro del juego con información al pasar el mouse sobre algo.",
     nm_cursorName = "Mostrar nombre",
     nm_cursorName_tip = "Muestra el nombre del personaje apuntado en letras grandes junto al cursor.",
     nm_size = "Tamaño",
@@ -174,12 +179,16 @@ ns.AddLocale("es", {
     nm_showLevel_tip = "Muestra el nivel después del nombre, como (32). Los élites llevan un +, y (??) significa que es demasiado alto para verlo.",
     nm_levelColor = "Colores de dificultad",
     nm_levelColor_tip = "Colorea el nivel según qué tan difícil es el personaje para ti. Desactivado: el nivel usa el color del nombre.",
+    nm_npcLevel = "Mostrar en PNJ amistosos",
+    nm_npcLevel_tip = "Desactivado: los PNJ amistosos (vendedores, instructores, guardias...) muestran su nombre sin el nivel. Los jugadores y enemigos lo mantienen.",
+    nm_npcTitle = "Título de PNJ amistosos",
+    nm_npcTitle_tip = "Muestra el título de los PNJ amistosos bajo su nombre, como <Vendedor de comida y bebida>. Se lee de los datos del tooltip del juego.",
     nm_questMark = "Marca de misión",
     nm_questMark_tip = "Muestra un ! antes del nombre cuando el personaje es parte de una de tus misiones activas.",
 
-    nm_secWho = "Mostrar para",
+    nm_secWho = "Mostrar el nombre para",
     nm_secObjects = "Objetos",
-    nm_objectsNote = "Cosas del mundo que no son personajes, como hierbas y vetas de mineral. Su nombre sale del tooltip del juego.",
+    nm_objectsNote = "Cosas del mundo que no son personajes.",
     nm_objHerbs = "Hierbas",
     nm_objHerbs_tip = "Plantas que se recogen con Herboristería.",
     nm_objOre = "Vetas de mineral",
@@ -194,7 +203,7 @@ ns.AddLocale("es", {
     nm_hostileNpcs = "PNJ hostiles",
     nm_hostileNpcs_tip = "PNJ que puedes atacar.",
 
-    nm_secHide = "Ocultar cuando",
+    nm_secHide = "Ocultar el nombre cuando",
     nm_hideCombat = "Estás en combate",
     nm_hideInstances = "Estás en instancia",
     nm_hideInstances_tip = "Mazmorras, bandas y campos de batalla.",
@@ -206,7 +215,7 @@ ns.AddLocale("es", {
     nm_worldOnly_tip = "El mouse está sobre un marco de la interfaz (como el del grupo o el del objetivo) en vez del mundo.",
 
     nm_secWorld = "Nombres sobre la cabeza",
-    nm_worldNote = "Son ajustes del propio juego, así que también cambian en las opciones del juego. Pasa el mouse sobre cada uno para ver el detalle.",
+    nm_worldNote = "Ajustes del propio juego. Pasa el mouse sobre cada uno para ver el detalle.",
     nm_wAlliedPlayers = "Jugadores aliados",
     nm_wEnemyPlayers = "Jugadores enemigos",
     nm_wHostileNpcs = "PNJ hostiles",
@@ -239,6 +248,7 @@ ns.AddLocale("es", {
     nm_toggledOff = "nombres sobre la cabeza ocultos. Usa /uiv togglenames para volver a mostrarlos.",
     nm_toggledOn = "nombres sobre la cabeza visibles otra vez.",
     nm_secQuick = "Alternar rápido",
+    nm_withName = "Junto al nombre",
     nm_showButton = "Mostrar el botón",
     nm_secButton = "Botón en pantalla",
     nm_showButton_tip = "Muestra un botón pequeño que oculta o muestra todos los nombres sobre la cabeza con un clic.",
@@ -249,7 +259,7 @@ ns.AddLocale("es", {
     target_names = "Solo nombres",
     target_all = "Nombres e interfaz",
     nm_secAuto = "Ocultar automáticamente",
-    nm_autoNote = "Oculta lo mismo que el alternar rápido, y lo vuelve a mostrar solo cuando la razón termina. Nunca deshace algo que ocultaste tú.",
+    nm_autoNote = "Oculta lo mismo que el alternar rápido, y lo devuelve cuando la razón termina.",
     nm_autoAfk = "Mientras estás ausente",
     nm_autoAfk_tip = "Oculta cuando quedas <Ausente>, y muestra otra vez cuando vuelves.",
     nm_autoIdle = "Tras un tiempo fuera de combate",
@@ -275,9 +285,9 @@ ns.AddLocale("es", {
     nm_tooltipCursor_tip = "Muestra el tooltip junto al cursor en vez de en la esquina de la pantalla.",
     nm_tooltipScale = "Tamaño",
     nm_tooltipDelay = "Retraso",
-    nm_tooltipNote = "El retraso solo se aplica a personajes y objetos del mundo, no a botones ni ventanas.",
+    nm_tooltipNote = "El retraso solo aplica a cosas del mundo, no a botones ni ventanas.",
 
-    nm_note = "El juego no deja a los addons saber dónde está la cabeza de un personaje en la pantalla, así que el nombre sigue al cursor.",
+    nm_note = "Los addons no pueden saber dónde está una cabeza en pantalla, así que el nombre sigue al cursor.",
     nm_st_disabled = "módulo desactivado",
     nm_st_showing = "mostrando a %s junto al cursor",
     nm_st_idle = "esperando el mouse",
@@ -294,6 +304,8 @@ local mod = {
         questMark = true,
         showLevel = true,
         levelColor = true,  -- false: the level uses the name's color
+        npcLevel = true,    -- false: friendly NPCs show no level
+        npcTitle = false,   -- title of friendly NPCs under the name
         skipDead = true,
         alliedPlayers = true,
         enemyPlayers = true,
@@ -431,6 +443,10 @@ label:SetAlpha(0)
 label:Hide()
 local text = label:CreateFontString(nil, "OVERLAY")
 
+-- Title of friendly NPCs (<Food & Drink Vendor>), under the name.
+local title = label:CreateFontString(nil, "OVERLAY")
+title:Hide()
+
 -- Yellow "!" quest mark, to the left of the name.
 local mark = label:CreateTexture(nil, "OVERLAY")
 if not (mark.SetAtlas and pcall(mark.SetAtlas, mark, "QuestNormal")) then
@@ -445,10 +461,24 @@ local OFFSETS = {
     below = { "TOP", 0, -32 },
 }
 
+-- The title goes under the name. Above the cursor, the pair moves up so the
+-- title doesn't cover the cursor.
 local function PlaceText()
-    local o = OFFSETS[mod.db.position] or OFFSETS.above
+    local position = mod.db.position
+    local o = OFFSETS[position] or OFFSETS.above
     text:ClearAllPoints()
-    text:SetPoint(o[1], label, "CENTER", o[2], o[3])
+    title:ClearAllPoints()
+    if title:IsShown() and position ~= "below" and position ~= "right" then
+        title:SetPoint("BOTTOM", label, "CENTER", o[2], o[3])
+        text:SetPoint("BOTTOM", title, "TOP", 0, 1)
+    else
+        text:SetPoint(o[1], label, "CENTER", o[2], o[3])
+        if position == "right" then
+            title:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -1)
+        else
+            title:SetPoint("TOP", text, "BOTTOM", 0, -1)
+        end
+    end
 end
 
 local function ApplyFont()
@@ -458,6 +488,12 @@ local function ApplyFont()
     end
     text:SetShadowOffset(1, -1)
     text:SetShadowColor(0, 0, 0, 1)
+    local titleSize = math.max(9, math.floor(mod.db.size * 0.75 + 0.5))
+    if not title:SetFont(font, titleSize, "OUTLINE") then
+        title:SetFont(STANDARD_TEXT_FONT, titleSize, "OUTLINE")
+    end
+    title:SetShadowOffset(1, -1)
+    title:SetShadowColor(0, 0, 0, 1)
     mark:SetSize(mod.db.size, mod.db.size)
     PlaceText()
 end
@@ -592,8 +628,49 @@ local function WantsObject()
     return true
 end
 
+-- True for NPCs you can't attack (vendors, trainers, guards...). nil if
+-- the game keeps it secret.
+local function IsFriendlyNpc()
+    local isPlayer = UnitIsPlayer("mouseover")
+    local canAttack = UnitCanAttack("player", "mouseover")
+    if ns.IsSecret(isPlayer) or ns.IsSecret(canAttack) then return nil end
+    return not isPlayer and not canAttack
+end
+
+-- True if a tooltip line is the "Level 19 Humanoid" line, not a title.
+local function IsLevelLine(line)
+    local word = LEVEL or "Level"
+    return line:find(word, 1, true) ~= nil and line:find("%d") ~= nil
+        or line:find(word .. " ??", 1, true) ~= nil
+end
+
+-- Title of the hovered NPC, like "Food & Drink Vendor": the second line of
+-- the game's tooltip data, when it isn't the level line. nil if there's
+-- none or it can't be read.
+local function NpcTitle()
+    local second
+    if C_TooltipInfo and C_TooltipInfo.GetUnit then
+        local ok, data = pcall(C_TooltipInfo.GetUnit, "mouseover")
+        if ok and data and data.lines and data.lines[2] then
+            second = data.lines[2].leftText
+        end
+    end
+    -- Older clients: the tooltip on screen, if it shows this NPC.
+    if second == nil and GameTooltip:IsShown() and GameTooltipTextLeft2 then
+        local ok, _, unit = pcall(GameTooltip.GetUnit, GameTooltip)
+        if ok and unit and not ns.IsSecret(unit) and Yes(UnitIsUnit(unit, "mouseover")) then
+            second = GameTooltipTextLeft2:GetText()
+        end
+    end
+    if second == nil or ns.IsSecret(second) or type(second) ~= "string" or second == "" then return nil end
+    if IsLevelLine(second) then return nil end
+    return second
+end
+
 local function SetFromObject()
     local o = hoveredObject
+    title:Hide()
+    PlaceText()
     text:SetText(o.name)
     text:SetTextColor(o.r, o.g, o.b)
     mark:Hide()
@@ -607,7 +684,7 @@ local function SetFromMouseover()
         hoveredName = "?"
     else
         local shown = name or ""
-        if mod.db.showLevel then
+        if mod.db.showLevel and (mod.db.npcLevel or IsFriendlyNpc() ~= true) then
             local level = LevelText()
             if level then shown = shown .. " " .. level end
         end
@@ -626,6 +703,16 @@ local function SetFromMouseover()
         r, g, b = 0.4, 0.4, 1
     end
     text:SetTextColor(r, g, b)
+
+    local npcTitle = mod.db.npcTitle and IsFriendlyNpc() and NpcTitle()
+    if npcTitle then
+        title:SetText("<" .. npcTitle .. ">")
+        title:SetTextColor(r, g, b)
+        title:Show()
+    else
+        title:Hide()
+    end
+    PlaceText()
 end
 
 local lastGUID
@@ -1271,26 +1358,40 @@ function mod.BuildOptions(parent, y)
     add(ns.CreateSlider(parent, L.nm_size, y,
         function() return db().size end,
         function(v) db().size = v; ApplyFont() end, 10, 40,
-        function(v) return tostring(math.floor(v + 0.5)) end))
+        function(v) return tostring(math.floor(v + 0.5)) end, { enabledIf = nameOn }))
     y = y - 32
     add(ns.CreateDropdown(parent, L.nm_position, y, POSITIONS,
         function() return db().position end,
-        function(v) db().position = v; PlaceText() end))
+        function(v) db().position = v; PlaceText() end, { enabledIf = nameOn }))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_delay, y,
         function() return db().delay end, set("delay"), 0, 10, 1,
-        function(v) return string.format("%.1f s", v / 10) end))
-    y = y - 32
+        function(v) return string.format("%.1f s", v / 10) end, { enabledIf = nameOn }))
+    y = y - 34
+
+    -- What shows next to the name: one column, sub-options indented under
+    -- the option they depend on.
+    ns.CreateHeader(parent, L.nm_withName, y)
+    y = y - 22
     add(ns.CreateCheck(parent, L.nm_showLevel, y,
         function() return db().showLevel end, set("showLevel"),
-        { x = COL1, width = WIDTH, tooltip = L.nm_showLevel_tip, enabledIf = nameOn }))
-    add(ns.CreateCheck(parent, L.nm_questMark, y,
-        function() return db().questMark end, set("questMark"),
-        { x = COL2, width = WIDTH, tooltip = L.nm_questMark_tip, enabledIf = nameOn }))
+        { x = COL1, width = 300, tooltip = L.nm_showLevel_tip, enabledIf = nameOn }))
     y = y - 26
     add(ns.CreateCheck(parent, L.nm_levelColor, y,
         function() return db().levelColor end, set("levelColor"),
-        { x = INDENT, width = WIDTH, tooltip = L.nm_levelColor_tip, enabledIf = levelOn }))
+        { x = INDENT, width = 300, tooltip = L.nm_levelColor_tip, enabledIf = levelOn }))
+    y = y - 26
+    add(ns.CreateCheck(parent, L.nm_npcLevel, y,
+        function() return db().npcLevel end, set("npcLevel"),
+        { x = INDENT, width = 300, tooltip = L.nm_npcLevel_tip, enabledIf = levelOn }))
+    y = y - 26
+    add(ns.CreateCheck(parent, L.nm_npcTitle, y,
+        function() return db().npcTitle end, set("npcTitle"),
+        { x = COL1, width = 300, tooltip = L.nm_npcTitle_tip, enabledIf = nameOn }))
+    y = y - 26
+    add(ns.CreateCheck(parent, L.nm_questMark, y,
+        function() return db().questMark end, set("questMark"),
+        { x = COL1, width = 300, tooltip = L.nm_questMark_tip, enabledIf = nameOn }))
     y = y - 40
 
     -- Show for
@@ -1395,6 +1496,45 @@ function mod.BuildOptions(parent, y)
     end)
     y = y - 34
 
+    ns.CreateSection(parent, L.nm_secButton, y)
+    y = y - 32
+    add(ns.CreateCheck(parent, L.nm_showButton, y,
+        function() return db().showButton end, set("showButton"),
+        { tooltip = L.nm_showButton_tip }))
+    y = y - 34
+    local buttonOn = function() return db().showButton end
+    add(ns.CreateDropdown(parent, L.nm_buttonStyle, y, { "style_eye", "style_spell" },
+        function() return db().buttonStyle end,
+        function(v) db().buttonStyle = v; UpdateToggleLook(); refreshAll() end,
+        { x = INDENT, enabledIf = buttonOn }))
+    y = y - 32
+    add(ns.CreateDropdown(parent, L.nm_buttonMode, y, { "shown", "hover" },
+        function() return db().buttonMode end, set("buttonMode"),
+        { x = INDENT, enabledIf = buttonOn }))
+    y = y - 32
+    add(ns.CreateStepper(parent, L.nm_buttonIdle, y,
+        function() return db().buttonIdleAlpha end, set("buttonIdleAlpha"), 0, 90, 10, "%",
+        { x = INDENT, tooltip = L.nm_buttonIdle_tip,
+          enabledIf = function() return buttonOn() and db().buttonMode == "hover" end }))
+    y = y - 32
+    add(ns.CreateSlider(parent, L.nm_buttonSize, y,
+        function() return db().buttonSize end,
+        function(v) db().buttonSize = v; ApplyToggleLayout() end, 20, 64,
+        function(v) return tostring(math.floor(v + 0.5)) end,
+        { x = INDENT, enabledIf = buttonOn }))
+    y = y - 34
+    local reset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    reset:SetSize(160, 22)
+    reset:SetPoint("TOPLEFT", 20, y)
+    reset:SetText(L.nm_resetPos)
+    reset:SetScript("OnClick", function()
+        db().buttonPoint = nil
+        ApplyToggleLayout()
+    end)
+    y = y - 28
+    ns.CreateNote(parent, L.nm_moveNote, y)
+    y = y - 34
+
     -- Hide automatically
     ns.CreateSection(parent, L.nm_secAuto, y)
     y = y - 30
@@ -1409,7 +1549,8 @@ function mod.BuildOptions(parent, y)
         { tooltip = L.nm_autoIdle_tip }))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_autoIdleTime, y,
-        function() return db().autoIdleTime end, set("autoIdleTime"), 10, 300, 10, " s"))
+        function() return db().autoIdleTime end, set("autoIdleTime"), 10, 300, 10, " s",
+        { x = 44, enabledIf = function() return db().autoIdle end }))
     y = y - 28
     add(ns.CreateCheck(parent, L.nm_autoStill, y,
         function() return db().autoStill end, set("autoStill"),
@@ -1420,40 +1561,6 @@ function mod.BuildOptions(parent, y)
         { x = 64, tooltip = L.nm_autoMouse_tip,
           enabledIf = function() return db().autoIdle and db().autoStill end }))
     y = y - 40
-
-    ns.CreateSection(parent, L.nm_secButton, y)
-    y = y - 32
-    add(ns.CreateCheck(parent, L.nm_showButton, y,
-        function() return db().showButton end, set("showButton"),
-        { tooltip = L.nm_showButton_tip }))
-    y = y - 34
-    add(ns.CreateDropdown(parent, L.nm_buttonStyle, y, { "style_eye", "style_spell" },
-        function() return db().buttonStyle end,
-        function(v) db().buttonStyle = v; UpdateToggleLook(); refreshAll() end))
-    y = y - 32
-    add(ns.CreateDropdown(parent, L.nm_buttonMode, y, { "shown", "hover" },
-        function() return db().buttonMode end, set("buttonMode")))
-    y = y - 32
-    add(ns.CreateStepper(parent, L.nm_buttonIdle, y,
-        function() return db().buttonIdleAlpha end, set("buttonIdleAlpha"), 0, 90, 10, "%",
-        { tooltip = L.nm_buttonIdle_tip }))
-    y = y - 32
-    add(ns.CreateSlider(parent, L.nm_buttonSize, y,
-        function() return db().buttonSize end,
-        function(v) db().buttonSize = v; ApplyToggleLayout() end, 20, 64,
-        function(v) return tostring(math.floor(v + 0.5)) end))
-    y = y - 34
-    local reset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    reset:SetSize(160, 22)
-    reset:SetPoint("TOPLEFT", 20, y)
-    reset:SetText(L.nm_resetPos)
-    reset:SetScript("OnClick", function()
-        db().buttonPoint = nil
-        ApplyToggleLayout()
-    end)
-    y = y - 28
-    ns.CreateNote(parent, L.nm_moveNote, y)
-    y = y - 34
 
     -- Tooltip
     ns.CreateSection(parent, L.nm_secTooltip, y)

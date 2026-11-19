@@ -13,7 +13,7 @@ ns.AddLocale("en", {
     uf_player = "Player", uf_pet = "Pet", uf_target = "Target",
     uf_tot = "Target of target", uf_focus = "Focus", uf_party = "Party",
     uf_raid = "Raid manager", uf_castbar = "Cast bar",
-    uf_note = "Hidden frames ignore the mouse. Changes made in combat finish applying when combat ends.",
+    uf_note = "Changes made in combat apply when it ends.",
 })
 ns.AddLocale("es", {
     tab_unitframes = "Marcos unidad",
@@ -21,7 +21,7 @@ ns.AddLocale("es", {
     uf_player = "Jugador", uf_pet = "Mascota", uf_target = "Objetivo",
     uf_tot = "Objetivo del objetivo", uf_focus = "Foco", uf_party = "Grupo",
     uf_raid = "Administrador de banda", uf_castbar = "Barra de lanzamiento",
-    uf_note = "Los marcos ocultos no responden al mouse. Los cambios hechos en combate terminan de aplicarse al salir de combate.",
+    uf_note = "Los cambios en combate se aplican al terminar.",
 })
 
 ns.NewElementsModule({

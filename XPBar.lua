@@ -123,7 +123,8 @@ end
 function mod.BuildOptions(parent, y)
     local refreshers = {}
     local function add(r) refreshers[#refreshers + 1] = r end
-    local function set(key) return function(v) mod.db[key] = v; dirty = true end end
+    local function refreshAll() for _, r in ipairs(refreshers) do r() end end
+    local function set(key) return function(v) mod.db[key] = v; dirty = true; refreshAll() end end
 
     add(ns.CreateCheck(parent, L.enabled, y,
         function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
@@ -132,13 +133,14 @@ function mod.BuildOptions(parent, y)
     ns.CreateSection(parent, L.xp_secShow, y)
     y = y - 32
     add(ns.CreateCheck(parent, L.xp_hover, y, function() return mod.db.hover end, set("hover"),
-        { x = 16, width = 160, tooltip = L.xp_hover_tip }))
+        { tooltip = L.xp_hover_tip }))
+    y = y - 28
     add(ns.CreateCheck(parent, L.xp_onGain, y, function() return mod.db.showOnGain end, set("showOnGain"),
-        { x = 216, width = 160, tooltip = L.xp_onGain_tip }))
-    y = y - 32
+        { tooltip = L.xp_onGain_tip }))
+    y = y - 30
     add(ns.CreateStepper(parent, L.xp_duration, y,
         function() return mod.db.gainDuration end, set("gainDuration"), 1, 30, 1, " s",
-        { tooltip = L.xp_duration_tip }))
+        { x = 44, tooltip = L.xp_duration_tip, enabledIf = function() return mod.db.showOnGain end }))
     y = y - 40
 
     ns.CreateSection(parent, L.xp_secHidden, y)
@@ -147,7 +149,7 @@ function mod.BuildOptions(parent, y)
         function() return mod.db.hiddenAlpha end, set("hiddenAlpha"), 0, 90, 10, "%",
         { tooltip = L.xp_hiddenOpacity_tip }))
 
-    return function() for _, r in ipairs(refreshers) do r() end end
+    return refreshAll
 end
 
 function mod.PrintStatus()

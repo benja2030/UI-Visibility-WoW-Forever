@@ -12,13 +12,13 @@ ns.AddLocale("en", {
     tab_actionbars = "Action bars",
     ab_title = "Action Bars",
     ab_bar = "Action Bar %d",
-    ab_note = "Hidden bars ignore the mouse, but their keybinds still work. Changes made in combat finish applying when combat ends.",
+    ab_note = "Keybinds always work. Changes made in combat apply when it ends.",
 })
 ns.AddLocale("es", {
     tab_actionbars = "Barras acción",
     ab_title = "Barras de acción",
     ab_bar = "Barra de acción %d",
-    ab_note = "Las barras ocultas no responden al mouse, pero sus atajos de teclado siguen funcionando. Los cambios hechos en combate terminan de aplicarse al salir de combate.",
+    ab_note = "Los atajos siempre funcionan. Los cambios en combate se aplican al terminar.",
 })
 
 local BAR_FRAMES = {

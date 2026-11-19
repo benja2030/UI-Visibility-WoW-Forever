@@ -51,20 +51,20 @@ ns.AddLocale("en", {
     page_bars = "Bars",
     page_frames = "Frames",
     sec_modules = "Modules",
-    generalIntro = "UI Visibility lets you choose when each part of the interface is visible. Turn modules on or off here, and press Open to set each one up. Hover any option to see what it does.",
-    desc_actionbars = "Hide your action bars, or show them only on mouse hover.",
-    desc_bars = "Hide the stance, pet, possess and totem bars, or show them on hover.",
-    desc_xp = "Shows the experience bar only on hover and after gaining experience.",
-    desc_unitframes = "Hide unit frames like player, target and party, or show them on hover.",
-    desc_prd = "Fades the health and resource bars under your character with combat and regeneration.",
-    desc_interface = "Hide the chat, quest trackers, buffs, bags and main menu, or show them on hover.",
-    desc_minimap = "Hide the texts and buttons around the minimap, or show them on hover.",
-    desc_names = "Shows the name of the character under your cursor, and controls the names above heads.",
+    generalIntro = "Choose when each part of the interface shows. Turn modules on here and press Open to set them up.",
+    desc_actionbars = "Hide your action bars, or choose when they show.",
+    desc_bars = "Stance, pet, possess and totem bars.",
+    desc_xp = "Shows the XP bar on hover and after gaining XP.",
+    desc_unitframes = "Player, target, party and other unit frames.",
+    desc_prd = "The health and resource bars under your character.",
+    desc_interface = "Chat, quest trackers, buffs, bags and menu.",
+    desc_minimap = "Texts and buttons around the minimap.",
+    desc_names = "Name under the cursor, and names above heads.",
     sec_appearance = "Appearance",
     sec_language = "Language and help",
     open = "Open",
     fadeSmooth = "Fade smoothness",
-    fadeNote = "0 is instant. Higher numbers fade more slowly.",
+    fadeNote = "0 is instant.",
     instant = "Instant",
     shown = "Shown", hidden = "Hidden", hover = "On hover",
     notFound = "not found",
@@ -98,20 +98,20 @@ ns.AddLocale("es", {
     page_bars = "Barras",
     page_frames = "Marcos",
     sec_modules = "Módulos",
-    generalIntro = "UI Visibility te deja elegir cuándo se ve cada parte de la interfaz. Activa o desactiva los módulos aquí, y pulsa Abrir para configurar cada uno. Pasa el mouse sobre cualquier opción para ver qué hace.",
-    desc_actionbars = "Oculta tus barras de acción, o muéstralas solo al pasar el mouse.",
-    desc_bars = "Oculta las barras de posturas, mascota, posesión y tótems, o muéstralas al pasar el mouse.",
-    desc_xp = "Muestra la barra de experiencia solo al pasar el mouse y al ganar experiencia.",
-    desc_unitframes = "Oculta marcos como el del jugador, el objetivo y el grupo, o muéstralos al pasar el mouse.",
-    desc_prd = "Desvanece las barras de vida y recurso bajo tu personaje según el combate y la regeneración.",
-    desc_interface = "Oculta el chat, las misiones, los beneficios, las bolsas y el menú, o muéstralos al pasar el mouse.",
-    desc_minimap = "Oculta los textos y botones alrededor del minimapa, o muéstralos al pasar el mouse.",
-    desc_names = "Muestra el nombre del personaje bajo el cursor y controla los nombres sobre la cabeza.",
+    generalIntro = "Elige cuándo se ve cada parte de la interfaz. Activa los módulos aquí y pulsa Abrir para configurarlos.",
+    desc_actionbars = "Oculta tus barras de acción, o elige cuándo se ven.",
+    desc_bars = "Barras de posturas, mascota, posesión y tótems.",
+    desc_xp = "Muestra la barra de XP con el mouse y al ganar XP.",
+    desc_unitframes = "Marcos del jugador, objetivo, grupo y otros.",
+    desc_prd = "Las barras de vida y recurso bajo tu personaje.",
+    desc_interface = "Chat, misiones, beneficios, bolsas y menú.",
+    desc_minimap = "Textos y botones alrededor del minimapa.",
+    desc_names = "Nombre bajo el cursor y nombres sobre la cabeza.",
     sec_appearance = "Apariencia",
     sec_language = "Idioma y ayuda",
     open = "Abrir",
     fadeSmooth = "Suavidad del fundido",
-    fadeNote = "0 es instantáneo. Números más altos se desvanecen más lento.",
+    fadeNote = "0 es instantáneo.",
     instant = "Instantáneo",
     shown = "Visible", hidden = "Oculta", hover = "Con el mouse",
     notFound = "no encontrado",
@@ -420,9 +420,21 @@ local function CreateModuleRow(parent, mod, y, index, onOpen)
     return function() check:SetChecked(mod.db.enabled) end
 end
 
+-- Options shared by the stepper, slider and dropdown:
+--   opts.x: where the label starts (indented under the option it depends on).
+--   opts.enabledIf: function; while it returns false the control is greyed
+--   out and can't be used.
+local function LabelColor(fs, on)
+    if on then fs:SetTextColor(1, 1, 1) else fs:SetTextColor(0.5, 0.5, 0.5) end
+end
+
+local function IsOn(opts)
+    return not (opts and opts.enabledIf) or (opts.enabledIf() and true or false)
+end
+
 function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, suffix, opts)
     local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", 20, y)
+    text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
     text:SetText(label)
     ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
@@ -433,15 +445,21 @@ function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, su
 
     -- "suffix" can be text added after the number, or a function that
     -- formats the whole value.
+    local minus, plus
     local function Refresh()
         if type(suffix) == "function" then
             value:SetText(suffix(getter()))
         else
             value:SetText(getter() .. suffix)
         end
+        local on = IsOn(opts)
+        minus:SetEnabled(on)
+        plus:SetEnabled(on)
+        LabelColor(text, on)
+        LabelColor(value, on)
     end
 
-    local minus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    minus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     minus:SetSize(24, 20)
     minus:SetPoint("RIGHT", value, "LEFT", -2, 0)
     minus:SetText("-")
@@ -449,7 +467,7 @@ function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, su
         setter(math.max(minV, getter() - step)); Refresh()
     end)
 
-    local plus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    plus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     plus:SetSize(24, 20)
     plus:SetPoint("LEFT", value, "RIGHT", 2, 0)
     plus:SetText("+")
@@ -477,10 +495,15 @@ function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format, o
         end, slider)
 
         local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("TOPLEFT", 20, y)
+        text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
         text:SetText(label)
         ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
-        return function() slider:SetValue(getter()) end
+        return function()
+            slider:SetValue(getter())
+            local on = IsOn(opts)
+            if slider.SetEnabled then pcall(slider.SetEnabled, slider, on) end
+            LabelColor(text, on)
+        end
     end)
     if ok then return refresh end
     return ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, 1, "", opts)
@@ -494,7 +517,7 @@ local optionDropdownCount = 0
 
 function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
     local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", 20, y)
+    text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
     text:SetText(label)
     ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
@@ -509,7 +532,12 @@ function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
                     function() setter(value) end)
             end
         end)
-        return function() dropdown:GenerateMenu() end
+        return function()
+            dropdown:GenerateMenu()
+            local on = IsOn(opts)
+            dropdown:SetEnabled(on)
+            LabelColor(text, on)
+        end
     end
 
     optionDropdownCount = optionDropdownCount + 1
@@ -528,7 +556,12 @@ function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
             UIDropDownMenu_AddButton(info)
         end
     end)
-    return function() UIDropDownMenu_SetText(legacy, L[getter()]) end
+    return function()
+        UIDropDownMenu_SetText(legacy, L[getter()])
+        local on = IsOn(opts)
+        if on then UIDropDownMenu_EnableDropDown(legacy) else UIDropDownMenu_DisableDropDown(legacy) end
+        LabelColor(text, on)
+    end
 end
 
 -- A label with a button that cycles through a list of values.

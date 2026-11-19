@@ -14,7 +14,7 @@ ns.AddLocale("en", {
     if_chat = "Chat", if_social = "Social button", if_quests = "Quest tracker",
     if_questie = "Questie tracker",
     if_buffs = "Buffs", if_debuffs = "Debuffs", if_bags = "Bags", if_micro = "Main menu",
-    if_note = "The chat is always shown while you type a message.",
+    if_note = "The chat always shows while you type.",
 })
 ns.AddLocale("es", {
     tab_interface = "Interfaz",
@@ -22,7 +22,7 @@ ns.AddLocale("es", {
     if_chat = "Chat", if_social = "Botón social", if_quests = "Misiones",
     if_questie = "Rastreador de Questie",
     if_buffs = "Beneficios", if_debuffs = "Perjuicios", if_bags = "Bolsas", if_micro = "Menú principal",
-    if_note = "El chat siempre se muestra mientras escribes un mensaje.",
+    if_note = "El chat siempre se muestra mientras escribes.",
 })
 
 local function FindChat()

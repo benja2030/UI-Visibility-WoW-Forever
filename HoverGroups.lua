@@ -20,10 +20,8 @@ local NUM_GROUPS = 4
 ns.AddLocale("en", {
     tab_groups = "Hover groups",
     hg_title = "Hover Groups",
-    desc_groups = "Show elements from different modules together when you hover any of them.",
-    hg_note = "Hovering any element of a group shows every element of that group that has \"Mouse over it\" ticked in Show when. "
-        .. "Other elements can be in a group too: hovering them shows the others. "
-        .. "Elements in Hidden mode stay hidden. A group needs at least two elements.",
+    desc_groups = "Show elements from different modules together on hover.",
+    hg_note = "Hovering any element of a group shows the ones with \"Mouse over it\" ticked. Hidden elements stay hidden. A group needs two or more.",
     hg_secGroup = "Group",
     hg_editing = "Group to edit",
     hg_count = "Elements in this group: %d",
@@ -36,10 +34,8 @@ ns.AddLocale("en", {
 ns.AddLocale("es", {
     tab_groups = "Grupos",
     hg_title = "Grupos al apuntar",
-    desc_groups = "Muestra juntos elementos de distintos módulos al pasar el mouse sobre cualquiera de ellos.",
-    hg_note = "Pasar el mouse sobre cualquier elemento de un grupo muestra todos los elementos del grupo que tienen \"Mouse encima\" marcado en Mostrar cuando. "
-        .. "Los demás elementos también pueden estar en un grupo: pasar el mouse sobre ellos muestra a los otros. "
-        .. "Los elementos en modo Oculto siguen ocultos. Un grupo necesita al menos dos elementos.",
+    desc_groups = "Muestra juntos elementos de distintos módulos al pasar el mouse.",
+    hg_note = "Apuntar a cualquier elemento de un grupo muestra los que tienen \"Mouse encima\" marcado. Los ocultos siguen ocultos. Un grupo necesita dos o más.",
     hg_secGroup = "Grupo",
     hg_editing = "Grupo a editar",
     hg_count = "Elementos en este grupo: %d",

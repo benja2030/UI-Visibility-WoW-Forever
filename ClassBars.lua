@@ -11,13 +11,13 @@ ns.AddLocale("en", {
     tab_bars = "Class bars",
     bars_title = "Class Bars",
     bars_stance = "Stance Bar", bars_pet = "Pet Bar", bars_possess = "Possess Bar", bars_totem = "Totem Bar",
-    bars_note = "Hidden bars ignore the mouse, but their keybinds still work. Changes made in combat finish applying when combat ends.",
+    bars_note = "Keybinds always work. Changes made in combat apply when it ends.",
 })
 ns.AddLocale("es", {
     tab_bars = "Barras clase",
     bars_title = "Barras de clase",
     bars_stance = "Barra de posturas", bars_pet = "Barra de mascota", bars_possess = "Barra de posesión", bars_totem = "Barra de tótems",
-    bars_note = "Las barras ocultas no responden al mouse, pero sus atajos de teclado siguen funcionando. Los cambios hechos en combate terminan de aplicarse al salir de combate.",
+    bars_note = "Los atajos siempre funcionan. Los cambios en combate se aplican al terminar.",
 })
 
 ns.NewElementsModule({

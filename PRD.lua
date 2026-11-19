@@ -34,8 +34,8 @@ ns.AddLocale("en", {
     tab_prd = "Resources",
     prd_title = "Personal Resource Display",
     prd_secOpacity = "Opacity",
-    prd_opacityNote = "How visible the display is in combat, while you regenerate out of combat, and when everything is full.",
-    prd_trackedNote = "While these change out of combat, the display uses the Regenerating opacity. When they stop, it uses Full bars.",
+    prd_opacityNote = "In combat, while regenerating, and with full bars.",
+    prd_trackedNote = "Out of combat, the display uses Regenerating while these change.",
     prd_secTracked = "Counts as regenerating",
     prd_secText = "Bar text",
     prd_secTiming = "Timing",
@@ -60,8 +60,7 @@ ns.AddLocale("en", {
     prd_m_values = "exact (values)", prd_m_bars = "exact (bar fill)", prd_m_activity = "activity",
     prd_unknown = "unknown",
     prd_secConditions = "Conditions",
-    prd_conditionsNote = "Also show when: while any ticked condition is true, the display is at least at its opacity. "
-        .. "Also hide when: while any is true, it's at most at its opacity, even in combat. If both apply, hide wins.",
+    prd_conditionsNote = "Extra rules on top of the ones above. Show can only raise the opacity, hide can only lower it (even in combat). Hide wins.",
     prd_showWhen = "Also show when",
     prd_hideWhen = "Also hide when",
     prd_alphaShowMenu = "Opacity when shown: %d%%",
@@ -74,8 +73,8 @@ ns.AddLocale("es", {
     tab_prd = "Recursos",
     prd_title = "Personal Resource Display",
     prd_secOpacity = "Opacidad",
-    prd_opacityNote = "Qué tan visible es el display en combate, mientras regeneras fuera de combate, y cuando todo está lleno.",
-    prd_trackedNote = "Mientras estos cambian fuera de combate, el display usa la opacidad Regenerando. Cuando se detienen, usa Barras llenas.",
+    prd_opacityNote = "En combate, mientras regeneras y con las barras llenas.",
+    prd_trackedNote = "Fuera de combate, el display usa Regenerando mientras estos cambian.",
     prd_secTracked = "Cuenta como regeneración",
     prd_secText = "Texto de las barras",
     prd_secTiming = "Tiempos",
@@ -100,8 +99,7 @@ ns.AddLocale("es", {
     prd_m_values = "exacta (valores)", prd_m_bars = "exacta (relleno de barra)", prd_m_activity = "actividad",
     prd_unknown = "desconocido",
     prd_secConditions = "Condiciones",
-    prd_conditionsNote = "Mostrar también cuando: mientras cualquier condición marcada se cumpla, el display queda al menos en su opacidad. "
-        .. "Ocultar también cuando: mientras cualquiera se cumpla, queda como máximo en su opacidad, incluso en combate. Si se cumplen ambas, gana ocultar.",
+    prd_conditionsNote = "Reglas extra sobre las de arriba. Mostrar solo sube la opacidad, ocultar solo la baja (incluso en combate). Gana ocultar.",
     prd_showWhen = "Mostrar también cuando",
     prd_hideWhen = "Ocultar también cuando",
     prd_alphaShowMenu = "Opacidad al mostrarse: %d%%",
@@ -544,6 +542,24 @@ function mod.BuildOptions(parent, y)
     end
     y = y - 12
 
+    ns.CreateSection(parent, L.prd_secTracked, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - 12
+    local items = {
+        { "prd_health", function() return db().health end, function(v) db().health = v end },
+    }
+    for _, key in ipairs({ "mana", "rage", "energy", "other" }) do
+        items[#items + 1] = { key,
+            function() return db().power[key] end, function(v) db().power[key] = v end }
+    end
+    for i, item in ipairs(items) do
+        local col = (i - 1) % 2
+        add(ns.CreateCheck(parent, L[item[1]], y, item[2], set(item[3]),
+            { x = col == 0 and 16 or 216, width = 160, tooltip = tip(item[1]) }))
+        if col == 1 or i == #items then y = y - 28 end
+    end
+    y = y - 12
+
     ns.CreateSection(parent, L.prd_secConditions, y)
     y = y - 30
     y = y - ns.CreateNote(parent, L.prd_conditionsNote, y) - 16
@@ -565,24 +581,6 @@ function mod.BuildOptions(parent, y)
             alphaLabel = list[4],
         }))
         y = y - 34
-    end
-    y = y - 12
-
-    ns.CreateSection(parent, L.prd_secTracked, y)
-    y = y - 30
-    y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - 12
-    local items = {
-        { "prd_health", function() return db().health end, function(v) db().health = v end },
-    }
-    for _, key in ipairs({ "mana", "rage", "energy", "other" }) do
-        items[#items + 1] = { key,
-            function() return db().power[key] end, function(v) db().power[key] = v end }
-    end
-    for i, item in ipairs(items) do
-        local col = (i - 1) % 2
-        add(ns.CreateCheck(parent, L[item[1]], y, item[2], set(item[3]),
-            { x = col == 0 and 16 or 216, width = 160, tooltip = tip(item[1]) }))
-        if col == 1 or i == #items then y = y - 28 end
     end
     y = y - 12
 
