@@ -68,6 +68,7 @@ ns.AddLocale("en", {
     instant = "Instant",
     shown = "Shown", hidden = "Hidden", hover = "On hover",
     notFound = "not found",
+    st_off = "turned off. Turn it on in the General tab (/uiv).",
     helpTitle = "UI Visibility - Help",
     helpText = "If UI Visibility stops loading after a WoW: Forever update:\n\n"
         .. "1. At character select, open the AddOns list.\n\n"
@@ -78,7 +79,7 @@ ns.AddLocale("en", {
         .. "5. Save the file and restart the game.",
     helpCopy = "Click the box and press Ctrl+C to copy the command.",
     helpFooter = "If the addon doesn't load you can't open this window, so these steps are also in README.txt inside the addon folder.",
-    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv options, /uiv help, /uiv status, /uiv togglenames",
+    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv groups, /uiv options, /uiv help, /uiv status, /uiv togglenames",
 })
 ns.AddLocale("es", {
     loaded = "activo. Escribe /uiv para abrir las opciones.",
@@ -114,6 +115,7 @@ ns.AddLocale("es", {
     instant = "Instantáneo",
     shown = "Visible", hidden = "Oculta", hover = "Con el mouse",
     notFound = "no encontrado",
+    st_off = "desactivado. Actívalo en la pestaña General (/uiv).",
     helpTitle = "UI Visibility - Ayuda",
     helpText = "Si UI Visibility deja de cargar después de una actualización de WoW: Forever:\n\n"
         .. "1. En la selección de personaje, abre la lista de AddOns.\n\n"
@@ -124,7 +126,7 @@ ns.AddLocale("es", {
         .. "5. Guarda el archivo y reinicia el juego.",
     helpCopy = "Haz clic en el recuadro y presiona Ctrl+C para copiar el comando.",
     helpFooter = "Si el addon no carga no podrás abrir esta ventana, así que estos pasos también están en README.txt dentro de la carpeta del addon.",
-    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv opciones, /uiv ayuda, /uiv estado, /uiv togglenames",
+    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv grupos, /uiv opciones, /uiv ayuda, /uiv estado, /uiv togglenames",
 })
 
 function ns.Print(msg) print(ns.PREFIX .. msg) end
@@ -362,6 +364,7 @@ local MODULE_ICONS = {
     interface  = "Interface\\Icons\\INV_Misc_Bag_08",
     minimap    = "Interface\\Icons\\INV_Misc_Map_01",
     names      = "Interface\\Icons\\Spell_Holy_MindVision",
+    groups     = "Interface\\Icons\\INV_Misc_Spyglass_03",
 }
 
 -- Description of a module, or nil.
@@ -1109,20 +1112,28 @@ local TAB_ALIASES = {
     unitframes = "unitframes", frames = "unitframes", uf = "unitframes",
     interface = "interface", interfaz = "interface",
     names = "names", nombres = "names",
+    groups = "groups", grupos = "groups",
     general = "general",
 }
 
-local function PrintAllStatus()
-    for _, mod in ipairs(ns.moduleList) do
-        if mod.db.enabled and mod.PrintStatus then mod.PrintStatus() end
+-- A turned off module says so, instead of listing settings that don't apply.
+local function PrintModuleStatus(mod)
+    if not mod.db.enabled then
+        ns.Print(L[mod.titleKey] .. ": " .. L.st_off)
+    elseif mod.PrintStatus then
+        mod.PrintStatus()
     end
+end
+
+local function PrintAllStatus()
+    for _, mod in ipairs(ns.moduleList) do PrintModuleStatus(mod) end
 end
 
 -- Handles "cmd arg" for one module: its own commands first, then status.
 local function ModuleCommand(mod, cmd, arg)
     if cmd == "" then ns.OpenWindow(mod.key); return end
     if cmd == "status" or cmd == "estado" then
-        if mod.PrintStatus then mod.PrintStatus() end
+        PrintModuleStatus(mod)
         return
     end
     if mod.Command and mod.Command(cmd, arg) then return end

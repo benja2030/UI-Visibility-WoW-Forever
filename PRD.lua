@@ -8,8 +8,21 @@
 -- power events; when the bars are full (or rage reaches 0), they stop. The
 -- wait time adapts to the rhythm of the regeneration ticks.
 --
+-- "Also show when" and "Also hide when" (optional, nothing ticked by
+-- default): the same conditions as the other modules' Show when (mouse over
+-- it, mounted, with a target...), each list with its own opacity. They're
+-- applied on top of the rules above:
+--   * While any Also show when condition is true, the display uses at least
+--     that opacity (it can only become more visible).
+--   * While any Also hide when condition is true, the display uses at most
+--     that opacity (it can only become less visible). Hide wins over show.
+-- The bar text still follows its own option. The display can also be part
+-- of a hover group.
+--
 -- Performance: the display is updated on events. The fast tick only checks
--- one time value, to hide the display when a regeneration window ends.
+-- one time value, to hide the display when a regeneration window ends, plus
+-- the condition lists if any condition is ticked or the display is in a
+-- hover group.
 
 local ADDON_NAME, ns = ...
 local L = ns.Lproxy
@@ -46,6 +59,16 @@ ns.AddLocale("en", {
     prd_method = "detection: %s | health rhythm: %s (+%.1fs learned) | resource rhythm: %s (+%.1fs learned)",
     prd_m_values = "exact (values)", prd_m_bars = "exact (bar fill)", prd_m_activity = "activity",
     prd_unknown = "unknown",
+    prd_secConditions = "Conditions",
+    prd_conditionsNote = "Also show when: while any ticked condition is true, the display is at least at its opacity. "
+        .. "Also hide when: while any is true, it's at most at its opacity, even in combat. If both apply, hide wins.",
+    prd_showWhen = "Also show when",
+    prd_hideWhen = "Also hide when",
+    prd_alphaShowMenu = "Opacity when shown: %d%%",
+    prd_alphaHideMenu = "Opacity when hidden: %d%%",
+    prd_st_showWhen = "also show when: %s | now: %s",
+    prd_st_hideWhen = "also hide when: %s | now: %s",
+    prd_st_hiding = "hiding",
 })
 ns.AddLocale("es", {
     tab_prd = "Recursos",
@@ -76,6 +99,16 @@ ns.AddLocale("es", {
     prd_method = "detección: %s | ritmo de vida: %s (+%.1fs aprendido) | ritmo de recurso: %s (+%.1fs aprendido)",
     prd_m_values = "exacta (valores)", prd_m_bars = "exacta (relleno de barra)", prd_m_activity = "actividad",
     prd_unknown = "desconocido",
+    prd_secConditions = "Condiciones",
+    prd_conditionsNote = "Mostrar también cuando: mientras cualquier condición marcada se cumpla, el display queda al menos en su opacidad. "
+        .. "Ocultar también cuando: mientras cualquiera se cumpla, queda como máximo en su opacidad, incluso en combate. Si se cumplen ambas, gana ocultar.",
+    prd_showWhen = "Mostrar también cuando",
+    prd_hideWhen = "Ocultar también cuando",
+    prd_alphaShowMenu = "Opacidad al mostrarse: %d%%",
+    prd_alphaHideMenu = "Opacidad al ocultarse: %d%%",
+    prd_st_showWhen = "mostrar también cuando: %s | ahora: %s",
+    prd_st_hideWhen = "ocultar también cuando: %s | ahora: %s",
+    prd_st_hiding = "ocultando",
 })
 
 local mod = {
@@ -90,9 +123,17 @@ local mod = {
         alphaRegen = 50,
         alphaIdle = 0,
         textCombatOnly = true,
+        showWhen = {},   -- condition key -> true (Also show when)
+        alphaShow = 100,
+        hideWhen = {},   -- condition key -> true (Also hide when)
+        alphaHide = 0,
     },
 }
 ns.RegisterModule(mod)
+
+-- For hover groups: the display counts as one element.
+local HOVER_ID = "prd.display"
+mod.elements = { { key = "display", id = HOVER_ID, label = "prd_title" } }
 
 local POWER_KEYS = { [0] = "mana", [1] = "rage", [3] = "energy" }
 local DECAY_POWER = { [1] = true, [6] = true } -- resources that drop to 0 at rest
@@ -103,7 +144,9 @@ local applying = false
 local lastReason = "-"
 local dirty = true
 local nextCheck = math.huge
-local targetAlpha  -- opacity the display is fading toward
+local targetAlpha  -- opacity the display is fading toward (from the rules above)
+local currentState = "disabled"
+local hoverUntil = 0
 
 local track = {
     health = { last = 0, untilTime = 0, intervals = {}, learned = 0 },
@@ -318,6 +361,7 @@ end
 local function Apply()
     if not prd then return end
     local state = GetState()
+    currentState = state
     targetAlpha = TargetAlpha(state) -- the fast tick fades toward it
     ApplyText(state)
 
@@ -335,12 +379,65 @@ end
 
 function mod.MarkDirty() dirty = true end
 
+---------------------------------------------------------------------------
+-- Also show when
+---------------------------------------------------------------------------
+local function InGroup()
+    return ns.IsGroupTrigger and ns.IsGroupTrigger(HOVER_ID) or false
+end
+
+local function AnyTicked(conds)
+    for _, on in pairs(conds) do
+        if on then return true end
+    end
+    return false
+end
+
+-- Mouse over the display, kept for a moment after it leaves. Also tells
+-- hover groups.
+local function UpdateHover(now)
+    local db = mod.db
+    if (db.showWhen.hover or db.hideWhen.hover or InGroup()) and ns.IsCursorOver(prd) then
+        hoverUntil = now + ns.HOVER_LINGER
+        ns.elementHover[HOVER_ID] = hoverUntil
+    end
+end
+
+-- True if any ticked condition of the list is true now. In the show list,
+-- "mouse over it" also counts a hover group showing the display.
+local function Met(conds, now, useGroups)
+    for _, cond in ipairs(ns.CONDITIONS) do
+        if conds[cond.key] then
+            if cond.test then
+                if ns.ConditionTrue(cond, now) then return true end
+            elseif now < hoverUntil
+                or (useGroups and ns.GroupShows and ns.GroupShows(HOVER_ID, now)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Opacity after the condition lists, from the opacity of the rules above.
+local function WithConditions(alpha, now)
+    local db = mod.db
+    local show, hide = AnyTicked(db.showWhen), AnyTicked(db.hideWhen)
+    if not (show or hide or InGroup()) then return alpha end
+    UpdateHover(now)
+    if show and Met(db.showWhen, now, true) then alpha = math.max(alpha, db.alphaShow / 100) end
+    if hide and Met(db.hideWhen, now, false) then alpha = math.min(alpha, db.alphaHide / 100) end
+    return alpha
+end
+
 function mod.OnTick(now)
     if not prd then return end
     if dirty or now >= nextCheck then Apply() end
     if targetAlpha then
+        local goal = targetAlpha
+        if currentState ~= "disabled" then goal = WithConditions(goal, now) end
         applying = true
-        ns.Fade(prd, targetAlpha)
+        ns.Fade(prd, goal)
         applying = false
     end
 end
@@ -392,6 +489,8 @@ end
 
 function mod.OnLogin()
     Attach()
+    -- Listed after the other modules in the Hover groups tab.
+    if ns.elementModules then table.insert(ns.elementModules, mod) end
 end
 
 events:SetScript("OnEvent", function(self, event)
@@ -445,6 +544,30 @@ function mod.BuildOptions(parent, y)
     end
     y = y - 12
 
+    ns.CreateSection(parent, L.prd_secConditions, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.prd_conditionsNote, y) - 16
+    for _, list in ipairs({
+        { "showWhen", "alphaShow", L.prd_showWhen, L.prd_alphaShowMenu, { 100, 90, 80, 70, 60, 50, 40, 30, 20, 10 } },
+        { "hideWhen", "alphaHide", L.prd_hideWhen, L.prd_alphaHideMenu, { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90 } },
+    }) do
+        local condKey, alphaKey = list[1], list[2]
+        add(ns.CreateConditionDropdown(parent, list[3], y, {
+            has = function(c) return db()[condKey][c] or false end,
+            toggle = function(c)
+                local conds = db()[condKey]
+                conds[c] = not conds[c] or nil
+                dirty = true
+            end,
+            alpha = function() return db()[alphaKey] end,
+            setAlpha = function(v) db()[alphaKey] = v; dirty = true end,
+            alphaValues = list[5],
+            alphaLabel = list[4],
+        }))
+        y = y - 34
+    end
+    y = y - 12
+
     ns.CreateSection(parent, L.prd_secTracked, y)
     y = y - 30
     y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - 12
@@ -495,6 +618,22 @@ function mod.PrintStatus()
     local state = GetState()
     ns.Print(string.format(L.prd_status, L[STATE_KEYS[state]],
         math.floor(TargetAlpha(state) * 100 + 0.5), lastReason, L[PowerKey()]))
+    local now = GetTime()
+    UpdateHover(now)
+    for _, list in ipairs({
+        { mod.db.showWhen, mod.db.alphaShow, L.prd_st_showWhen, L.st_showing, true },
+        { mod.db.hideWhen, mod.db.alphaHide, L.prd_st_hideWhen, L.prd_st_hiding, false },
+    }) do
+        local names = {}
+        for _, cond in ipairs(ns.CONDITIONS) do
+            if list[1][cond.key] then names[#names + 1] = L["cond_" .. cond.key .. "_s"] end
+        end
+        if #names > 0 then
+            local met = state ~= "disabled" and Met(list[1], now, list[5])
+            ns.Print(string.format(list[3], table.concat(names, ", "),
+                (met and list[4] or L.st_waiting) .. " (" .. list[2] .. "%)"))
+        end
+    end
 end
 
 local function RhythmText(t)

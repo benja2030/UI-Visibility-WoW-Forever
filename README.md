@@ -17,7 +17,7 @@ The options are grouped in tabs by where each part is on screen.
 ### Frames
 
 - **Unit frames**: Player, pet, target, target of target, focus, party, raid manager and cast bar.
-- **Personal Resource Display**: By default, fully visible in combat, half visible while health or resources regenerate, and hidden when everything is full. Every opacity can be changed, and the bar text can show only in combat.
+- **Personal Resource Display**: By default, fully visible in combat, half visible while health or resources regenerate, and hidden when everything is full. Every opacity can be changed, and the bar text can show only in combat. Two dropdowns add the same conditions as Show when (mouse over it, mounted, with a target...), each with its own opacity: **Also show when** can only make the display more visible, and **Also hide when** can only make it less visible, even in combat. If both apply, hide wins. It can also be part of a hover group.
 
 ### Interface
 
@@ -34,13 +34,27 @@ Zone text, clock, calendar, tracking, mail, addon button, compass border, day/ni
 - **Tooltip**: The tooltip can show next to the cursor instead of in the corner, bigger, and after a short delay.
 - **Names above heads**: Turn the game's own names above heads on or off by category (allied and enemy players, hostile, interactive and special NPCs, pets, guardians and minions, totems, critters, your own name, weak enemies, guild names and titles). One button, or `/uiv togglenames` in a macro, hides them all and brings them back exactly as they were. It can hide only the names, or the names and the whole interface (like Alt+Z), by hand or automatically while you're away or after some time out of combat. That button can also sit on your screen, always visible or only on mouse hover.
 
-### Shown, Hidden or On hover
+### Shown, Hidden or Show when
 
-In the Action bars, Class bars, Unit frames, Interface and Minimap modules, every element can be:
+In the Action bars, Class bars, Unit frames, Interface and Minimap modules, every element has a menu where it can be:
 
 - **Shown**: the game's normal behavior. The addon doesn't touch the element.
 - **Hidden**: invisible, and it ignores the mouse. Keybinds of hidden action bars still work.
-- **On hover**: invisible until the mouse passes over it.
+- **Show when**: tick one or more conditions. The element shows while any of them is true:
+  - Mouse over it, in combat, out of combat, I have a target, my target is an enemy, in a group, in an instance, resting (inn or city), mounted, flying, swimming, moving, standing still, dragging a spell or item.
+  - Two opacities in the same menu: **when shown** (100% by default) and **otherwise** (0% by default). For example, a bar at 50% that goes to 100% when you hover it.
+  - While it's invisible it can't be clicked, so you can't press a hidden ability by mistake. Keybinds always work.
+  - In combat, the game doesn't let addons change what can be clicked, so it's decided when combat starts: what's visible then (or appears because you're in combat) can be clicked. With **Invisible elements can't be clicked in combat** (on by default), anything invisible when combat starts stays unclickable until it ends, even if it shows on hover. Turn it off to keep those clickable during the fight.
+
+Settings from older versions are kept: **On hover** is now Show when with **Mouse over it** ticked.
+
+### Hover groups
+
+Each module has **Show hover elements together**, but only for its own elements. **Hover groups** do the same across modules: put elements from any of the five modules above, or the Personal Resource Display, in a group (for example Action Bar 1, the player frame and the bags), and hovering any of them shows every element of the group that has **Mouse over it** ticked. There are four groups.
+
+- Other elements can be in a group too (for example one in **Shown** mode): hovering them shows the rest of the group.
+- Elements in **Hidden** mode stay hidden.
+- A group needs at least two elements.
 
 ## Before you start: parts that are off in the game
 
@@ -72,10 +86,10 @@ UI Visibility only controls parts of the interface that the game is showing. Som
 
 ## Options and commands
 
-Options are in **Options > AddOns > UI Visibility**, and in a window with the same tabs that opens with `/uiv` or by clicking UI Visibility in the minimap's addon button. The tabs are **General, Bars, Frames, Interface, Minimap and Names**. The General tab lists every module with an **Open** button that goes to its tab. Hover any option to see what it does.
+Options are in **Options > AddOns > UI Visibility**, and in a window with the same tabs that opens with `/uiv` or by clicking UI Visibility in the minimap's addon button. The tabs are **General, Bars, Frames, Interface, Minimap, Names and Hover groups**. The General tab lists every module with an **Open** button that goes to its tab. Hover any option to see what it does.
 
 - `/uiv`: Opens the options window
-- `/uiv prd`, `xp`, `bars`, `actionbars`, `unitframes`, `interface`, `minimap`, `names`: Opens the tab with that module
+- `/uiv prd`, `xp`, `bars`, `actionbars`, `unitframes`, `interface`, `minimap`, `names`, `groups`: Opens the tab with that module
 - `/uiv options`: Opens the pages in the game's Options menu
 - `/uiv help`: Opens the help window
 - `/uiv status`: Shows the state of every module
@@ -128,7 +142,7 @@ Las opciones están agrupadas en pestañas según dónde está cada parte en la 
 ### Marcos
 
 - **Marcos de unidad**: Jugador, mascota, objetivo, objetivo del objetivo, foco, grupo, administrador de banda y barra de lanzamiento.
-- **Personal Resource Display**: Por defecto, totalmente visible en combate, a medias mientras se regenera la vida o el recurso, y oculto cuando todo está lleno. Cada opacidad se puede cambiar, y el texto de las barras puede verse solo en combate.
+- **Personal Resource Display**: Por defecto, totalmente visible en combate, a medias mientras se regenera la vida o el recurso, y oculto cuando todo está lleno. Cada opacidad se puede cambiar, y el texto de las barras puede verse solo en combate. Dos menús agregan las mismas condiciones de Mostrar cuando (mouse encima, montado, con objetivo...), cada uno con su propia opacidad: **Mostrar también cuando** solo puede hacerlo más visible, y **Ocultar también cuando** solo puede hacerlo menos visible, incluso en combate. Si se cumplen ambos, gana ocultar. También puede estar en un grupo al apuntar.
 
 ### Interfaz
 
@@ -145,13 +159,27 @@ Texto de zona, reloj, calendario, rastreo, correo, botón de addons, borde de br
 - **Tooltip**: El tooltip puede aparecer junto al cursor en vez de en la esquina, más grande y con un pequeño retraso.
 - **Nombres sobre la cabeza**: Activa o desactiva por categoría los nombres que el juego muestra sobre la cabeza (jugadores aliados y enemigos, PNJ hostiles, interactivos y especiales, mascotas, guardianes y esbirros, tótems, criaturas, tu propio nombre, enemigos menores, hermandad y títulos). Un botón, o `/uiv togglenames` en una macro, los oculta todos y los vuelve a mostrar exactamente como estaban. Puede ocultar solo los nombres, o los nombres y toda la interfaz (como Alt+Z), a mano o automáticamente mientras estás ausente o tras un tiempo fuera de combate. Ese botón también puede estar en tu pantalla, siempre visible o solo al pasar el mouse.
 
-### Visible, Oculto o Con el mouse
+### Visible, Oculto o Mostrar cuando
 
-En los módulos de barras de acción, barras de clase, marcos de unidad, interfaz y minimapa, cada elemento puede estar:
+En los módulos de barras de acción, barras de clase, marcos de unidad, interfaz y minimapa, cada elemento tiene un menú donde puede estar:
 
 - **Visible**: el comportamiento normal del juego. El addon no toca el elemento.
 - **Oculto**: invisible, y no responde al mouse. Los atajos de teclado de las barras de acción ocultas siguen funcionando.
-- **Con el mouse**: invisible hasta que el mouse pasa por encima.
+- **Mostrar cuando**: marca una o más condiciones. El elemento se muestra mientras cualquiera se cumpla:
+  - Mouse encima, en combate, fuera de combate, tengo un objetivo, mi objetivo es enemigo, en grupo, en una instancia, descansando (posada o ciudad), montado, volando, nadando, en movimiento, quieto, arrastrando un hechizo u objeto.
+  - Dos opacidades en el mismo menú: **al mostrarse** (100% por defecto) y **el resto del tiempo** (0% por defecto). Por ejemplo, una barra al 50% que sube a 100% al pasar el mouse.
+  - Mientras está invisible no se puede clickear, así que no puedes presionar una habilidad oculta por error. Los atajos de teclado siempre funcionan.
+  - En combate, el juego no deja que los addons cambien qué se puede clickear, así que se decide al empezar el combate: lo que se ve en ese momento (o aparece por estar en combate) se puede clickear. Con **No clickear elementos invisibles en combate** (activado por defecto), lo que esté invisible al empezar el combate no se puede clickear hasta que termine, aunque aparezca con el mouse. Desactívalo para poder clickearlos durante el combate.
+
+Se mantiene la configuración de versiones anteriores: **Con el mouse** ahora es Mostrar cuando con **Mouse encima** marcado.
+
+### Grupos al apuntar
+
+Cada módulo tiene **Mostrar juntos al apuntar**, pero solo para sus propios elementos. Los **Grupos al apuntar** hacen lo mismo entre módulos: pon en un grupo elementos de cualquiera de los cinco módulos de arriba, o el Personal Resource Display, (por ejemplo la Barra de acción 1, el marco del jugador y las bolsas), y al pasar el mouse sobre cualquiera de ellos se muestran todos los elementos del grupo que tienen **Mouse encima** marcado. Hay cuatro grupos.
+
+- Los demás elementos también pueden estar en un grupo (por ejemplo uno en modo **Visible**): pasar el mouse sobre ellos muestra al resto del grupo.
+- Los elementos en modo **Oculto** siguen ocultos.
+- Un grupo necesita al menos dos elementos.
 
 ## Antes de empezar: partes que están apagadas en el juego
 
@@ -183,10 +211,10 @@ UI Visibility solo controla partes de la interfaz que el juego está mostrando. 
 
 ## Opciones y comandos
 
-Las opciones están en **Opciones > AddOns > UI Visibility**, y en una ventana con las mismas pestañas que se abre con `/uiv` o haciendo clic en UI Visibility dentro del botón de addons del minimapa. Las pestañas son **General, Barras, Marcos, Interfaz, Minimapa y Nombres**. La pestaña General muestra cada módulo con un botón **Abrir** que lleva a su pestaña. Pasa el mouse sobre cualquier opción para ver qué hace.
+Las opciones están en **Opciones > AddOns > UI Visibility**, y en una ventana con las mismas pestañas que se abre con `/uiv` o haciendo clic en UI Visibility dentro del botón de addons del minimapa. Las pestañas son **General, Barras, Marcos, Interfaz, Minimapa, Nombres y Grupos**. La pestaña General muestra cada módulo con un botón **Abrir** que lleva a su pestaña. Pasa el mouse sobre cualquier opción para ver qué hace.
 
 - `/uiv`: Abre la ventana de opciones
-- `/uiv prd`, `xp`, `bars`, `actionbars`, `unitframes`, `interface`, `minimap`, `names`: Abre la pestaña con ese módulo
+- `/uiv prd`, `xp`, `bars`, `actionbars`, `unitframes`, `interface`, `minimap`, `names`, `grupos`: Abre la pestaña con ese módulo
 - `/uiv opciones`: Abre las páginas en el menú de Opciones del juego
 - `/uiv ayuda`: Abre la ventana de ayuda
 - `/uiv estado`: Muestra el estado de cada módulo
