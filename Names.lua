@@ -50,6 +50,7 @@ ns.AddLocale("en", {
     nm_levelColor = "Difficulty colors",
     nm_levelColor_tip = "Colors the level by how hard the character is for you. Off: the level uses the name's color.",
     nm_npcLevel = "Show on friendly NPCs",
+    nm_recovered = "Names were hidden when the game closed. They're shown again.",
     nm_npcLevel_tip = "Off: friendly NPCs (vendors, trainers, guards...) show their name without the level. Players and enemies keep it.",
     nm_npcTitle = "Title of friendly NPCs",
     nm_npcTitle_tip = "Shows the title of friendly NPCs under their name, like <Food & Drink Vendor>. It's read from the game's tooltip data.",
@@ -180,6 +181,7 @@ ns.AddLocale("es", {
     nm_levelColor = "Colores de dificultad",
     nm_levelColor_tip = "Colorea el nivel según qué tan difícil es el personaje para ti. Desactivado: el nivel usa el color del nombre.",
     nm_npcLevel = "Mostrar en PNJ amistosos",
+    nm_recovered = "Los nombres estaban ocultos cuando se cerró el juego. Se muestran de nuevo.",
     nm_npcLevel_tip = "Desactivado: los PNJ amistosos (vendedores, instructores, guardias...) muestran su nombre sin el nivel. Los jugadores y enemigos lo mantienen.",
     nm_npcTitle = "Título de PNJ amistosos",
     nm_npcTitle_tip = "Muestra el título de los PNJ amistosos bajo su nombre, como <Vendedor de comida y bebida>. Se lee de los datos del tooltip del juego.",
@@ -920,6 +922,81 @@ local function ToggleWorldNames()
 end
 
 ---------------------------------------------------------------------------
+-- Never left hidden after the game closes
+---------------------------------------------------------------------------
+-- The quick toggle hides names by changing game settings (CVars), and the
+-- game keeps those settings after it closes. Two safeguards:
+--   * Logging out or closing normally while names are hidden: they're put
+--     back right before the game saves its settings (PLAYER_LOGOUT).
+--   * A crash while hidden: this addon's saved data isn't written, so it
+--     doesn't know names were hidden. At every normal logout it keeps a copy
+--     of the name settings as they were (namesSnapshot). At login, if every
+--     setting the quick toggle hides is off but that copy had some on, the
+--     game most likely closed while they were hidden, and the copy is put
+--     back.
+local function ToggleCVarNames()
+    local list = {}
+    for _, option in ipairs(WORLD_NAMES) do
+        if option.toggle then
+            for _, name in ipairs(option.cvars) do
+                if CVarExists(name) then list[#list + 1] = name end
+            end
+        end
+    end
+    return list
+end
+
+local function OnLogout()
+    local db = mod.db
+    if not db then return end
+    if db.worldNamesSaved then
+        for name, value in pairs(db.worldNamesSaved) do
+            if CVarExists(name) then pcall(SetCVar, name, value) end
+        end
+        db.worldNamesSaved = nil
+    end
+    db.autoReason = nil
+    local snapshot = {}
+    for _, name in ipairs(ToggleCVarNames()) do snapshot[name] = GetCVar(name) end
+    db.namesSnapshot = snapshot
+end
+
+-- Returns true if names had to be shown again.
+local function RecoverNames()
+    local db = mod.db
+    -- Hidden when the game closed, and the addon knows it.
+    if db.worldNamesSaved then
+        for name, value in pairs(db.worldNamesSaved) do
+            if CVarExists(name) then pcall(SetCVar, name, value) end
+        end
+        db.worldNamesSaved = nil
+        db.autoReason = nil
+        return true
+    end
+    -- Hidden when the game crashed: everything off, but not at the last logout.
+    local snapshot = db.namesSnapshot
+    if type(snapshot) ~= "table" then return false end
+    local names = ToggleCVarNames()
+    if #names == 0 then return false end
+    for _, name in ipairs(names) do
+        if GetCVar(name) ~= "0" then return false end
+    end
+    local anyOn = false
+    for _, value in pairs(snapshot) do
+        if value ~= "0" then anyOn = true end
+    end
+    if not anyOn then return false end
+    for name, value in pairs(snapshot) do
+        if CVarExists(name) then pcall(SetCVar, name, value) end
+    end
+    return true
+end
+
+local logoutEvents = CreateFrame("Frame")
+logoutEvents:RegisterEvent("PLAYER_LOGOUT")
+logoutEvents:SetScript("OnEvent", OnLogout)
+
+---------------------------------------------------------------------------
 -- Quick toggle: button on screen
 ---------------------------------------------------------------------------
 local optionRefreshers = {} -- open option pages, refreshed after a toggle
@@ -1310,6 +1387,7 @@ function mod.SetEnabled(v)
 end
 
 function mod.OnLogin()
+    if RecoverNames() then ns.Print(L.nm_recovered) end
     ApplyFont()
     ApplyToggleLayout()
     HookTooltip()
