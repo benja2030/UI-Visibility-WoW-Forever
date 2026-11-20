@@ -50,6 +50,8 @@ Settings from older versions are kept: **On hover** is now Show when with **Mous
 
 **Glowing buttons hide with their bar** (Action bars, on by default): some addons, like Glowing Bars, make glowing buttons ignore their bar's opacity so they always show. With this on, buttons on bars that UI Visibility hides or fades follow their bar, glow included. Bars set to Shown aren't affected.
 
+**Live Portraits**: if you use it, its 3D portraits hide together with their unit frame. Nothing to set up.
+
 ### Hover groups
 
 Each module has **Show hover elements together**, but only for its own elements. **Hover groups** do the same across modules: put elements from any of the five modules above, or the Personal Resource Display, in a group (for example Action Bar 1, the player frame and the bags), and hovering any of them shows every element of the group that has **Mouse over it** ticked. There are four groups.
@@ -176,6 +178,8 @@ En los módulos de barras de acción, barras de clase, marcos de unidad, interfa
 Se mantiene la configuración de versiones anteriores: **Con el mouse** ahora es Mostrar cuando con **Mouse encima** marcado.
 
 **Los botones brillantes se ocultan con su barra** (Barras de acción, activado por defecto): algunos addons, como Glowing Bars, hacen que los botones que brillan ignoren la opacidad de su barra para verse siempre. Con esto activado, los botones de barras que UI Visibility oculta o desvanece siguen a su barra, brillo incluido. Las barras en Visible no se ven afectadas.
+
+**Live Portraits**: si lo usas, sus retratos 3D se ocultan junto con su marco de unidad. No hay nada que configurar.
 
 ### Grupos al apuntar
 

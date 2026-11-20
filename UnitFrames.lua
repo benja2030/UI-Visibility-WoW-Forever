@@ -4,6 +4,12 @@
 --
 -- Unit frames are protected: their mouse can't change in combat, so a change
 -- made in combat is applied when combat ends. Opacity changes at any time.
+--
+-- Live Portraits (Benjamin's addon) puts a 3D model over the portraits of
+-- these frames. 3D models don't always follow their frame's opacity, so the
+-- head stayed visible on a hidden frame. While a portrait's frame is fully
+-- faded out, its model is hidden here, and shown again when the frame comes
+-- back (if Live Portraits still wants it).
 
 local ADDON_NAME, ns = ...
 
@@ -24,7 +30,7 @@ ns.AddLocale("es", {
     uf_note = "Los cambios en combate se aplican al terminar.",
 })
 
-ns.NewElementsModule({
+local mod = ns.NewElementsModule({
     key = "unitframes", titleKey = "uf_title", tabKey = "tab_unitframes",
     noteKey = "uf_note",
     elements = {
@@ -46,3 +52,39 @@ ns.NewElementsModule({
         },
     },
 })
+
+---------------------------------------------------------------------------
+-- Live Portraits
+---------------------------------------------------------------------------
+local hiddenModels = {} -- model -> true while hidden here
+
+local function SyncPortraits()
+    local lp = rawget(_G, "LivePortraits")
+    if type(lp) ~= "table" or type(lp.portraits) ~= "table" then return end
+    for texture, p in pairs(lp.portraits) do
+        local model = p.model
+        local parent = texture.GetParent and texture:GetParent()
+        if model and parent then
+            local ok, alpha = pcall(parent.GetEffectiveAlpha, parent)
+            if ok and not ns.IsSecret(alpha) then
+                if mod.db.enabled and alpha < 0.01 then
+                    if model:IsShown() then
+                        model:Hide()
+                        hiddenModels[model] = true
+                    end
+                elseif hiddenModels[model] then
+                    hiddenModels[model] = nil
+                    -- Only if Live Portraits still shows this one (not
+                    -- switched back to the 2D portrait meanwhile).
+                    if p.active then model:Show() end
+                end
+            end
+        end
+    end
+end
+
+local engineTick = mod.OnTick
+function mod.OnTick(now)
+    engineTick(now)
+    SyncPortraits()
+end
