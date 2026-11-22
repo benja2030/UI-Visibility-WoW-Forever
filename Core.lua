@@ -62,6 +62,20 @@ ns.AddLocale("en", {
     desc_names = "Name under the cursor, and names above heads.",
     sec_appearance = "Appearance",
     sec_language = "Language and help",
+    sec_profile = "Settings for this character",
+    prof_char = "Character: %s",
+    prof_accountWide = "Use account-wide settings",
+    prof_accountWide_tip = "On: this character shares its settings with every character that has this on. "
+        .. "Off: it keeps its own, starting as a copy of the account-wide ones (which stay as they are).",
+    prof_copy = "Copy settings from",
+    prof_copy_tip = "Replaces this character's settings with a copy of the ones you pick. This character then uses its own settings.",
+    prof_choose = "Choose...",
+    prof_account = "Account-wide settings",
+    prof_noneOther = "No other character has its own settings yet",
+    prof_note = "Both reload the interface.",
+    prof_toOwn = "Give this character its own settings? It starts with a copy of the account-wide ones. The interface reloads.",
+    prof_toAccount = "Use the account-wide settings on this character? Its own settings are kept in case you come back. The interface reloads.",
+    prof_copyAsk = "Copy the settings of %s to this character? Its current settings are replaced. The interface reloads.",
     open = "Open",
     fadeSmooth = "Fade smoothness",
     fadeNote = "0 is instant.",
@@ -109,6 +123,20 @@ ns.AddLocale("es", {
     desc_names = "Nombre bajo el cursor y nombres sobre la cabeza.",
     sec_appearance = "Apariencia",
     sec_language = "Idioma y ayuda",
+    sec_profile = "Configuración de este personaje",
+    prof_char = "Personaje: %s",
+    prof_accountWide = "Usar la configuración de la cuenta",
+    prof_accountWide_tip = "Activado: este personaje comparte su configuración con todos los personajes que lo tengan activado. "
+        .. "Desactivado: tiene la suya propia, que empieza como copia de la de la cuenta (que queda igual).",
+    prof_copy = "Copiar configuración de",
+    prof_copy_tip = "Reemplaza la configuración de este personaje por una copia de la que elijas. El personaje pasa a usar su configuración propia.",
+    prof_choose = "Elegir...",
+    prof_account = "Configuración de la cuenta",
+    prof_noneOther = "Ningún otro personaje tiene configuración propia todavía",
+    prof_note = "Ambos recargan la interfaz.",
+    prof_toOwn = "¿Dar a este personaje su propia configuración? Empieza con una copia de la de la cuenta. La interfaz se recarga.",
+    prof_toAccount = "¿Usar la configuración de la cuenta en este personaje? Su configuración propia se guarda por si vuelves. La interfaz se recarga.",
+    prof_copyAsk = "¿Copiar la configuración de %s a este personaje? Su configuración actual se reemplaza. La interfaz se recarga.",
     open = "Abrir",
     fadeSmooth = "Suavidad del fundido",
     fadeNote = "0 es instantáneo.",
@@ -181,7 +209,7 @@ end
 -- Fade duration in seconds, from the "Fade smoothness" setting (0 to 10):
 -- 0 is instant, each step adds 0.1 seconds.
 function ns.FadeTime()
-    local steps = ns.db and ns.db.fadeSmoothness or 2
+    local steps = ns.settings and ns.settings.fadeSmoothness or 2
     return steps * 0.1
 end
 
@@ -600,6 +628,31 @@ local function ApplyDefaults(target, defaults)
     end
 end
 
+-- Settings per character
+-- UIVisibilityDB holds everything, account-wide:
+--   language, lastTab: always shared.
+--   modules, fadeSmoothness: the account-wide settings (as in older versions).
+--   chars["Name - Realm"] = { own = true/false, settings = { modules, fadeSmoothness } }:
+--     a character with own = true uses its "settings" instead of the account-wide
+--     ones. Turning own off keeps them, in case it's turned on again.
+-- ns.settings is the table in use (UIVisibilityDB itself, or a character's).
+-- Modules read their settings at load, so switching needs a reload.
+local function DeepCopy(t)
+    if type(t) ~= "table" then return t end
+    local copy = {}
+    for k, v in pairs(t) do copy[k] = DeepCopy(v) end
+    return copy
+end
+ns.DeepCopy = DeepCopy
+
+local function CharKey()
+    local name = UnitName("player")
+    if type(name) ~= "string" or ns.IsSecret(name) or name == "" then return nil end
+    local realm = GetRealmName and GetRealmName()
+    if type(realm) ~= "string" or ns.IsSecret(realm) or realm == "" then realm = "?" end
+    return name .. " - " .. realm
+end
+
 local function InitDB()
     UIVisibilityDB = UIVisibilityDB or {}
     local db = UIVisibilityDB
@@ -607,13 +660,165 @@ local function InitDB()
     if db.lastTab == nil then db.lastTab = "general" end
     if db.fadeSmoothness == nil then db.fadeSmoothness = 2 end
     db.modules = db.modules or {}
+    db.chars = db.chars or {}
+
+    local settings = db
+    ns.charKey = CharKey()
+    if ns.charKey then
+        local char = db.chars[ns.charKey] or { own = false }
+        db.chars[ns.charKey] = char
+        if char.own then
+            char.settings = char.settings or {}
+            settings = char.settings
+            if settings.fadeSmoothness == nil then settings.fadeSmoothness = db.fadeSmoothness end
+            settings.modules = settings.modules or {}
+        end
+    end
+
     for _, mod in ipairs(ns.moduleList) do
-        db.modules[mod.key] = db.modules[mod.key] or {}
-        ApplyDefaults(db.modules[mod.key], mod.defaults)
-        mod.db = db.modules[mod.key]
+        settings.modules[mod.key] = settings.modules[mod.key] or {}
+        ApplyDefaults(settings.modules[mod.key], mod.defaults)
+        mod.db = settings.modules[mod.key]
     end
     ns.db = db
+    ns.settings = settings
     ns.L = ns.LOCALES[db.language] or ns.LOCALES.en
+end
+
+-- A copy of some settings ("account" or a character key), ready to become
+-- this character's. Modules can fix values that belong to this session
+-- (mod.OnCopy, like Names' hidden-names state).
+local function CopyOf(source)
+    local db = UIVisibilityDB
+    local from
+    if source == "account" then
+        from = { modules = db.modules, fadeSmoothness = db.fadeSmoothness }
+    else
+        local char = db.chars[source]
+        from = char and char.settings
+    end
+    if not from then return nil end
+    local copy = DeepCopy({ modules = from.modules or {}, fadeSmoothness = from.fadeSmoothness })
+    for _, mod in ipairs(ns.moduleList) do
+        if mod.OnCopy and copy.modules[mod.key] then mod.OnCopy(copy.modules[mod.key], mod.db) end
+    end
+    return copy
+end
+
+-- Characters (other than this one) that have their own settings, sorted.
+local function OtherCharacters()
+    local list = {}
+    for key, char in pairs(UIVisibilityDB.chars or {}) do
+        if key ~= ns.charKey and char.own and char.settings then list[#list + 1] = key end
+    end
+    table.sort(list)
+    return list
+end
+
+local function UsesOwn()
+    local char = ns.charKey and UIVisibilityDB.chars[ns.charKey]
+    return char and char.own or false
+end
+
+local function ConfirmReload(text, onAccept, onCancel)
+    StaticPopupDialogs["UIVISIBILITY_PROFILE"] = {
+        text = text,
+        button1 = L.reloadNow,
+        button2 = CANCEL or L.later,
+        OnAccept = onAccept,
+        OnCancel = onCancel,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    StaticPopup_Show("UIVISIBILITY_PROFILE")
+end
+
+local function SetOwnSettings(own, onCancel)
+    if not ns.charKey or own == UsesOwn() then return end
+    ConfirmReload(own and L.prof_toOwn or L.prof_toAccount, function()
+        local char = UIVisibilityDB.chars[ns.charKey]
+        if own and not char.settings then char.settings = CopyOf("account") end
+        char.own = own
+        ReloadUI()
+    end, onCancel)
+end
+
+local function CopySettingsFrom(source)
+    if not ns.charKey then return end
+    local name = source == "account" and L.prof_account or source
+    ConfirmReload(string.format(L.prof_copyAsk, name), function()
+        local copy = CopyOf(source)
+        if not copy then return end
+        local char = UIVisibilityDB.chars[ns.charKey]
+        char.settings = copy
+        char.own = true
+        ReloadUI()
+    end)
+end
+
+-- "Copy settings from": a menu of sources, not a choice that stays shown.
+local copyDropdownCount = 0
+local function CreateCopyDropdown(parent, y)
+    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    text:SetPoint("TOPLEFT", 20, y)
+    text:SetText(L.prof_copy)
+    ns.AttachTooltip(parent, text, L.prof_copy, L.prof_copy_tip)
+
+    local function Sources()
+        local list = {}
+        if UsesOwn() then list[1] = "account" end
+        for _, key in ipairs(OtherCharacters()) do list[#list + 1] = key end
+        return list
+    end
+    local function Name(source) return source == "account" and L.prof_account or source end
+
+    local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    if ok and dropdown and dropdown.SetupMenu then
+        dropdown:SetWidth(170)
+        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        if dropdown.SetDefaultText then pcall(dropdown.SetDefaultText, dropdown, L.prof_choose) end
+        dropdown:SetupMenu(function(_, root)
+            local sources = Sources()
+            if #sources == 0 then
+                root:CreateTitle(L.prof_noneOther)
+                return
+            end
+            for _, source in ipairs(sources) do
+                root:CreateButton(Name(source), function() CopySettingsFrom(source) end)
+            end
+            if #OtherCharacters() == 0 then root:CreateTitle(L.prof_noneOther) end
+        end)
+        return function()
+            dropdown:GenerateMenu()
+            if dropdown.Text and not dropdown.SetDefaultText then dropdown.Text:SetText(L.prof_choose) end
+            dropdown:SetEnabled(ns.charKey ~= nil)
+        end
+    end
+
+    copyDropdownCount = copyDropdownCount + 1
+    local legacy = CreateFrame("Frame", "UIVisibilityCopyDropdown" .. copyDropdownCount, parent, "UIDropDownMenuTemplate")
+    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    UIDropDownMenu_SetWidth(legacy, 160)
+    UIDropDownMenu_Initialize(legacy, function()
+        local sources = Sources()
+        for _, source in ipairs(sources) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = Name(source)
+            info.notCheckable = true
+            info.func = function() CopySettingsFrom(source) end
+            UIDropDownMenu_AddButton(info)
+        end
+        if #OtherCharacters() == 0 then
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = L.prof_noneOther
+            info.notCheckable = true
+            info.disabled = true
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    return function() UIDropDownMenu_SetText(legacy, L.prof_choose) end
 end
 
 ---------------------------------------------------------------------------
@@ -822,8 +1027,8 @@ local function BuildGeneral(parent, y, openModule)
     ns.CreateSection(parent, L.sec_appearance, y)
     y = y - 34
     refreshers[#refreshers + 1] = ns.CreateSlider(parent, L.fadeSmooth, y,
-        function() return ns.db.fadeSmoothness end,
-        function(v) ns.db.fadeSmoothness = v end,
+        function() return ns.settings.fadeSmoothness end,
+        function(v) ns.settings.fadeSmoothness = v end,
         0, 10,
         function(v)
             v = math.floor(v + 0.5)
@@ -832,6 +1037,27 @@ local function BuildGeneral(parent, y, openModule)
         end,
         { tooltip = L.fadeNote })
     y = y - 40
+
+    -- Settings for this character
+    ns.CreateSection(parent, L.sec_profile, y)
+    y = y - 30
+    local who = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    who:SetPoint("TOPLEFT", 20, y)
+    who:SetText(string.format(L.prof_char, ns.charKey or "?"))
+    y = y - 22
+    local accountCheck
+    accountCheck = ns.CreateCheck(parent, L.prof_accountWide, y,
+        function() return not UsesOwn() end,
+        function(v)
+            SetOwnSettings(not v, function() accountCheck() end)
+            accountCheck()
+        end,
+        { tooltip = L.prof_accountWide_tip, width = 360, enabledIf = function() return ns.charKey ~= nil end })
+    refreshers[#refreshers + 1] = accountCheck
+    y = y - 32
+    refreshers[#refreshers + 1] = CreateCopyDropdown(parent, y)
+    y = y - 30
+    y = y - ns.CreateNote(parent, L.prof_note, y) - 16
 
     ns.CreateSection(parent, L.sec_language, y)
     y = y - 42

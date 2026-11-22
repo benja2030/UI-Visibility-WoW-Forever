@@ -60,6 +60,15 @@ Each module has **Show hover elements together**, but only for its own elements.
 - Elements in **Hidden** mode stay hidden.
 - A group needs at least two elements.
 
+### Settings per character
+
+In the General tab, under **Settings for this character**:
+
+- **Use account-wide settings** (on by default): every character with it on shares the same settings. Turn it off to give a character its own, starting as a copy of the account-wide ones.
+- **Copy settings from**: copies the account-wide settings, or another character's own settings, to this character.
+
+Both reload the interface. The language is always shared.
+
 ## Before you start: parts that are off in the game
 
 UI Visibility only controls parts of the interface that the game is showing. Some of them are **off by default in the WoW client** and have to be turned on there first:
@@ -188,6 +197,15 @@ Cada módulo tiene **Mostrar juntos al apuntar**, pero solo para sus propios ele
 - Los demás elementos también pueden estar en un grupo (por ejemplo uno en modo **Visible**): pasar el mouse sobre ellos muestra al resto del grupo.
 - Los elementos en modo **Oculto** siguen ocultos.
 - Un grupo necesita al menos dos elementos.
+
+### Configuración por personaje
+
+En la pestaña General, en **Configuración de este personaje**:
+
+- **Usar la configuración de la cuenta** (activado por defecto): todos los personajes que lo tienen activado comparten la misma configuración. Desactívalo para darle a un personaje la suya propia, que empieza como copia de la de la cuenta.
+- **Copiar configuración de**: copia a este personaje la configuración de la cuenta, o la configuración propia de otro personaje.
+
+Ambos recargan la interfaz. El idioma siempre es compartido.
 
 ## Antes de empezar: partes que están apagadas en el juego
 

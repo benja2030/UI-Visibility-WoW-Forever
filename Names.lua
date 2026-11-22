@@ -934,6 +934,16 @@ end
 --     setting the quick toggle hides is off but that copy had some on, the
 --     game most likely closed while they were hidden, and the copy is put
 --     back.
+-- Copying settings to another character (Core's settings per character):
+-- whether names are hidden right now belongs to this session, not to the
+-- settings. The copy never says names are hidden, and keeps this
+-- character's own copy of the name settings for crash recovery.
+function mod.OnCopy(new, current)
+    new.worldNamesSaved = nil
+    new.autoReason = nil
+    new.namesSnapshot = current and ns.DeepCopy(current.namesSnapshot) or nil
+end
+
 local function ToggleCVarNames()
     local list = {}
     for _, option in ipairs(WORLD_NAMES) do
