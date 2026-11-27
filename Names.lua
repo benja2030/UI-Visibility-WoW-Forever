@@ -348,19 +348,55 @@ local function Yes(value)
     return value and true or false
 end
 
--- True if the mouse is over the 3D world, not over an interface frame.
-local function MouseOverWorld()
+-- In combat. A secret answer from UnitAffectingCombat isn't taken as "yes"
+-- (that would count as combat all the time); InCombatLockdown is never secret.
+local function PlayerInCombat()
+    if InCombatLockdown() then return true end
+    local v = UnitAffectingCombat("player")
+    return not ns.IsSecret(v) and v and true or false
+end
+
+-- Frames under the mouse, top first.
+local function MouseFoci()
+    if GetMouseFoci then
+        local ok, list = pcall(GetMouseFoci)
+        if ok and type(list) == "table" then return list end
+        return {}
+    end
+    if GetMouseFocus then
+        local ok, focus = pcall(GetMouseFocus)
+        if ok and focus then return { focus } end
+    end
+    return {}
+end
+
+-- True for a frame that covers (almost) the whole screen, or that can't be
+-- seen. Such a frame catching the mouse isn't a part of the interface the
+-- player is pointing at (an overlay from the game or another addon), so
+-- the mouse still counts as over the world. Unreadable answers count as no.
+local function IsOverlay(frame)
     local ok, result = pcall(function()
-        if GetMouseFoci then
-            local focus = GetMouseFoci()[1]
-            return focus == nil or focus == WorldFrame
-        elseif GetMouseFocus then
-            local focus = GetMouseFocus()
-            return focus == nil or focus == WorldFrame
+        local alpha = frame:GetEffectiveAlpha()
+        if not ns.IsSecret(alpha) and alpha < 0.01 then return true end
+        local w, h, s = frame:GetWidth(), frame:GetHeight(), frame:GetEffectiveScale()
+        local sw, sh, ss = UIParent:GetWidth(), UIParent:GetHeight(), UIParent:GetEffectiveScale()
+        for _, v in ipairs({ w, h, s, sw, sh, ss }) do
+            if ns.IsSecret(v) then return false end
         end
-        return true
+        return w * s >= sw * ss * 0.9 and h * s >= sh * ss * 0.9
     end)
-    return not ok or result
+    return ok and result or false
+end
+
+-- True if the mouse is over the 3D world, not over an interface frame.
+-- Overlays (see IsOverlay) are looked through, to the frame below them.
+local function MouseOverWorld()
+    for _, focus in ipairs(MouseFoci()) do
+        if focus == WorldFrame then return true end
+        if type(focus) ~= "table" then return true end
+        if not IsOverlay(focus) then return false end
+    end
+    return true
 end
 
 local function HasNameplate()
@@ -392,25 +428,64 @@ local function IsQuestRelated()
     return false
 end
 
+-- True if the character under the mouse is you. When the game keeps the
+-- answer secret, the GUIDs are compared instead; if those are secret too,
+-- it's taken as someone else. (Taking a secret as "you" hid every name.)
+local function MouseoverIsPlayer()
+    local same = UnitIsUnit("mouseover", "player")
+    if not ns.IsSecret(same) then return same and true or false end
+    local a, b = UnitGUID("mouseover"), UnitGUID("player")
+    if a and b and not ns.IsSecret(a) and not ns.IsSecret(b) then return a == b end
+    return false
+end
+
+-- The frames under the mouse, described for /uiv names debug: path, type,
+-- size, strata, opacity, and whether they count as an overlay.
+local function FocusName()
+    local parts = {}
+    for i, focus in ipairs(MouseFoci()) do
+        local ok, desc = pcall(function()
+            local name = (focus.GetDebugName and focus:GetDebugName()) or (focus.GetName and focus:GetName())
+            if not name or name == "" then name = tostring(focus) end
+            local parent = focus.GetParent and focus:GetParent()
+            local parentName = parent and ((parent.GetDebugName and parent:GetDebugName()) or tostring(parent)) or "none"
+            local function n(v) return ns.IsSecret(v) and "?" or string.format("%.0f", v) end
+            local alpha = focus:GetEffectiveAlpha()
+            return string.format("%d: %s [%s, %sx%s, %s, alpha %s, parent %s%s]", i, name,
+                focus:GetObjectType(), n(focus:GetWidth()), n(focus:GetHeight()),
+                tostring(focus:GetFrameStrata()), ns.IsSecret(alpha) and "?" or string.format("%.2f", alpha),
+                parentName, IsOverlay(focus) and ", overlay" or "")
+        end)
+        parts[#parts + 1] = ok and desc or (i .. ": " .. tostring(focus))
+    end
+    if #parts == 0 then return "none" end
+    return table.concat(parts, " | ")
+end
+
 -- True if the character under the mouse should get the name at the cursor.
+-- The second value says why, for /uiv names debug.
 local function WantsHovered()
     local db = mod.db
-    if not Yes(UnitExists("mouseover")) then return false end
-    if Yes(UnitIsUnit("mouseover", "player")) then return false end
-    if db.worldOnly and not MouseOverWorld() then return false end
-    if db.hideCombat and (InCombatLockdown() or Yes(UnitAffectingCombat("player"))) then return false end
+    if not Yes(UnitExists("mouseover")) then return false, "no character under the mouse" end
+    if MouseoverIsPlayer() then return false, "it's you" end
+    if db.worldOnly and not MouseOverWorld() then
+        return false, "mouse over the interface (" .. FocusName() .. "), \"Over the interface\" is on"
+    end
+    if db.hideCombat and PlayerInCombat() then
+        return false, "in combat"
+    end
     if db.hideInstances then
         local inInstance, kind = IsInInstance()
-        if inInstance and kind ~= "none" then return false end
+        if inInstance and kind ~= "none" then return false, "in an instance" end
     end
-    if db.skipPlates and HasNameplate() then return false end
+    if db.skipPlates and HasNameplate() then return false, "has a nameplate" end
     if db.skipDead then
         local dead = UnitIsDead("mouseover")
-        if not ns.IsSecret(dead) and dead then return false end
+        if not ns.IsSecret(dead) and dead then return false, "dead" end
     end
     local isPlayer = UnitIsPlayer("mouseover")
     if ns.IsSecret(isPlayer) then
-        return db.alliedPlayers or db.enemyPlayers or db.friendlyNpcs or db.hostileNpcs
+        return db.alliedPlayers or db.enemyPlayers or db.friendlyNpcs or db.hostileNpcs, "player or NPC (secret)"
     end
 
     if isPlayer then
@@ -420,19 +495,19 @@ local function WantsHovered()
         local enemy
         if ns.IsSecret(mine) or ns.IsSecret(theirs) or not mine or not theirs then
             enemy = UnitIsEnemy("player", "mouseover")
-            if ns.IsSecret(enemy) then return db.alliedPlayers or db.enemyPlayers end
+            if ns.IsSecret(enemy) then return db.alliedPlayers or db.enemyPlayers, "player (faction secret)" end
         else
             enemy = mine ~= theirs
         end
-        if enemy then return db.enemyPlayers end
-        return db.alliedPlayers
+        if enemy then return db.enemyPlayers, "enemy player" end
+        return db.alliedPlayers, "allied player"
     end
 
     -- NPCs: hostile means you can attack it.
     local canAttack = UnitCanAttack("player", "mouseover")
-    if ns.IsSecret(canAttack) then return db.friendlyNpcs or db.hostileNpcs end
-    if canAttack then return db.hostileNpcs end
-    return db.friendlyNpcs
+    if ns.IsSecret(canAttack) then return db.friendlyNpcs or db.hostileNpcs, "NPC (attackable secret)" end
+    if canAttack then return db.hostileNpcs, "hostile NPC" end
+    return db.friendlyNpcs, "friendly NPC"
 end
 
 ---------------------------------------------------------------------------
@@ -622,7 +697,7 @@ local function WantsObject()
     if not hoveredObject then return false end
     if not db[CATEGORY_SETTING[hoveredObject.category]] then return false end
     if not MouseOverWorld() then return false end
-    if db.hideCombat and (InCombatLockdown() or Yes(UnitAffectingCombat("player"))) then return false end
+    if db.hideCombat and PlayerInCombat() then return false end
     if db.hideInstances then
         local inInstance, kind = IsInInstance()
         if inInstance and kind ~= "none" then return false end
@@ -722,15 +797,45 @@ local UpdateTooltipDelay -- defined in the tooltip section
 local UpdateToggleButton -- defined in the quick toggle section
 local UpdateAutoRules    -- defined in the "hide automatically" section
 
+-- /uiv names debug: prints why the name at the cursor shows or not, each
+-- time the reason changes. Errors are caught and printed instead of
+-- stopping the module.
+local tracing, lastTrace = false, nil
+
+local function Trace(textLine)
+    if textLine ~= lastTrace then
+        lastTrace = textLine
+        ns.Print("name at cursor: " .. textLine)
+    end
+end
+
+local function CheckHovered()
+    if not tracing then return WantsHovered() end
+    local ok, wants, why = pcall(WantsHovered)
+    if not ok then
+        Trace("error: " .. tostring(wants))
+        return false
+    end
+    local line = (wants and "show, " or "no, ") .. tostring(why)
+    -- Showing through an overlay: say what it is.
+    local top = MouseFoci()[1]
+    if wants and top ~= nil and top ~= WorldFrame then line = line .. " (looked through: " .. FocusName() .. ")" end
+    Trace(line)
+    return wants
+end
+
 function mod.OnTick(now)
     UpdateTooltipDelay(now)
     UpdateToggleButton(now)
     UpdateAutoRules(now)
     local db = mod.db
+    if tracing and not (db.enabled and db.cursorName) then
+        Trace(db.enabled and "\"Show name\" is off" or "module is off")
+    end
     -- What's under the mouse: a character first, otherwise an object.
     local key, fill
     if db.enabled and db.cursorName then
-        if WantsHovered() then
+        if CheckHovered() then
             local guid = UnitGUID("mouseover")
             if ns.IsSecret(guid) then guid = nil end
             key, fill = guid or "unit", SetFromMouseover
@@ -1817,6 +1922,11 @@ end
 
 function mod.Command(cmd)
     if cmd == "chat" then PrintChatDebug(); return true end
+    if cmd == "debug" then
+        tracing, lastTrace = not tracing, nil
+        ns.Print("name at cursor debug " .. (tracing and "on: hover a character. /uiv names debug again to stop." or "off."))
+        return true
+    end
     if cmd == "togglenames" then
         local result = ManualToggle()
         if result == true then
