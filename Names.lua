@@ -32,7 +32,7 @@ local POSITIONS = { "above", "right", "below" }
 
 ns.AddLocale("en", {
     tab_names = "Names",
-    nm_title = "Character Names",
+    nm_title = "Character names",
 
     nm_secName = "Name at the cursor",
     nm_withName = "Next to the name",
@@ -1105,6 +1105,138 @@ local lastActive = GetTime() -- last moment the player did something
 local uiHiddenByAddon = false -- this addon hid the interface
 local escPending = false      -- Esc showed it; hide it again when menus close
 
+-- Chat while the interface is hidden
+-- Hiding everything hides UIParent, and the chat (with its typing box) is
+-- inside it, so pressing Enter opened an invisible box. While the interface
+-- is hidden by this addon, the chat window being typed in is moved to a
+-- holder outside UIParent (same size and scale), so it shows. When the box
+-- closes, or the interface comes back, it goes back to its own parent.
+-- Chat frames aren't protected, so this also works in combat.
+local chatHolder
+local liftedChat = {} -- frame -> its original parent
+
+local function ChatHolder()
+    if not chatHolder then
+        chatHolder = CreateFrame("Frame", nil, WorldFrame)
+    end
+    local worldScale = WorldFrame:GetEffectiveScale()
+    chatHolder:SetScale(worldScale > 0 and UIParent:GetEffectiveScale() / worldScale or UIParent:GetScale())
+    chatHolder:ClearAllPoints()
+    chatHolder:SetAllPoints(UIParent)
+    chatHolder:Show()
+    return chatHolder
+end
+
+local function LiftChat(frame)
+    if not frame or liftedChat[frame] or not frame.SetParent then return end
+    liftedChat[frame] = frame:GetParent()
+    frame:SetParent(ChatHolder())
+end
+
+local function DropChat()
+    for frame, parent in pairs(liftedChat) do frame:SetParent(parent) end
+    wipe(liftedChat)
+end
+
+local chatDebug = { opened = 0, closed = 0, last = "none" } -- for /uiv names chat
+
+local function OnChatOpened(editBox)
+    if not uiHiddenByAddon or UIParent:IsShown() then return end
+    if type(editBox) ~= "table" or not editBox.GetParent then
+        editBox = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() or nil
+    end
+    if type(editBox) ~= "table" or not editBox.GetParent then return end
+    local chat = editBox.chatFrame or editBox:GetParent()
+    if liftedChat[chat] or liftedChat[editBox] then return end -- already out
+    chatDebug.opened = chatDebug.opened + 1
+    chatDebug.last = editBox.GetName and editBox:GetName() or "?"
+    if chat and chat ~= UIParent then LiftChat(chat) end
+    -- In some layouts the box isn't inside its chat window.
+    if editBox:GetParent() ~= chat then LiftChat(editBox) end
+end
+
+local ActiveChatBox -- defined below
+
+-- Only once no chat box is being typed in: moving the chat can make the box
+-- lose focus for a moment, which must not send it back right away.
+local function OnChatClosed()
+    if next(liftedChat) and not (ActiveChatBox and ActiveChatBox()) then
+        chatDebug.closed = chatDebug.closed + 1
+        DropChat()
+    end
+end
+
+-- The typing box itself is hooked: the moment the game shows it (Enter), the
+-- chat is moved out, before the game gives it focus (an invisible box can't
+-- take focus). The game's functions are hooked too where they exist, and
+-- focus for layouts where the box stays shown (IM style).
+local chatHooks = {}
+local function HookChatBox(box)
+    if not box or chatHooks[box] or not box.HookScript then return end
+    chatHooks[box] = true
+    hooksecurefunc(box, "Show", OnChatOpened)
+    hooksecurefunc(box, "Hide", OnChatClosed)
+    hooksecurefunc(box, "SetShown", function(self, shown)
+        if shown then OnChatOpened(self) else OnChatClosed() end
+    end)
+    box:HookScript("OnEditFocusGained", OnChatOpened)
+    box:HookScript("OnEditFocusLost", OnChatClosed)
+end
+for i = 1, (NUM_CHAT_WINDOWS or 10) do HookChatBox(_G["ChatFrame" .. i .. "EditBox"]) end
+if ChatEdit_ActivateChat then hooksecurefunc("ChatEdit_ActivateChat", OnChatOpened) end
+if ChatEdit_DeactivateChat then hooksecurefunc("ChatEdit_DeactivateChat", OnChatClosed) end
+if type(ChatFrameUtil) == "table" then
+    if ChatFrameUtil.ActivateChat then hooksecurefunc(ChatFrameUtil, "ActivateChat", OnChatOpened) end
+    if ChatFrameUtil.DeactivateChat then hooksecurefunc(ChatFrameUtil, "DeactivateChat", OnChatClosed) end
+end
+
+-- Safety check, only while everything is hidden (every tick, about 20 times
+-- a second, so the chat shows right away): asks the game which chat box is
+-- being typed in, in case it was opened in a way none of the hooks catch.
+function ActiveChatBox()
+    local get = ChatEdit_GetActiveWindow
+        or (type(ChatFrameUtil) == "table" and ChatFrameUtil.GetActiveWindow)
+    local ok, box = false, nil
+    if get then ok, box = pcall(get) end
+    if ok and type(box) == "table" and box.GetParent then return box end
+    for b in pairs(chatHooks) do
+        if b.HasFocus and b:HasFocus() then return b end
+    end
+    return nil
+end
+
+local function UpdateChatWhileHidden()
+    if not uiHiddenByAddon or UIParent:IsShown() then return end
+    local box = ActiveChatBox()
+    if box then
+        OnChatOpened(box)
+    elseif next(liftedChat) then
+        OnChatClosed()
+    end
+end
+
+-- /uiv names chat: why the chat does or doesn't show while everything is hidden.
+local function PrintChatDebug()
+    local box = ChatFrame1EditBox
+    local function name(f) return f and (f.GetName and f:GetName() or "?") or "none" end
+    ns.Print(string.format("hidden by addon %s, UIParent shown %s, chat style %s",
+        tostring(uiHiddenByAddon), tostring(UIParent:IsShown()), tostring(GetCVar and GetCVar("chatStyle"))))
+    ns.Print(string.format("active box now: %s", name(ActiveChatBox())))
+    ns.Print(string.format("hooks: ChatEdit_ActivateChat %s, ChatFrameUtil.ActivateChat %s, boxes %d",
+        tostring(ChatEdit_ActivateChat ~= nil),
+        tostring(type(ChatFrameUtil) == "table" and ChatFrameUtil.ActivateChat ~= nil), (function()
+            local n = 0 for _ in pairs(chatHooks) do n = n + 1 end return n end)()))
+    if box then
+        ns.Print(string.format("ChatFrame1EditBox: parent %s, chatFrame %s, shown %s, visible %s, focus %s",
+            name(box:GetParent()), name(box.chatFrame), tostring(box:IsShown()), tostring(box:IsVisible()),
+            tostring(box.HasFocus and box:HasFocus())))
+    end
+    local lifted = {}
+    for frame in pairs(liftedChat) do lifted[#lifted + 1] = name(frame) end
+    ns.Print(string.format("opened %d, closed %d, last box %s, moved now: %s", chatDebug.opened, chatDebug.closed,
+        chatDebug.last, #lifted > 0 and table.concat(lifted, ", ") or "none"))
+end
+
 -- What the player does by hand (buttons and command). It also forgets any
 -- automatic reason, so automatic rules never undo a manual choice, and
 -- restarts the "time out of combat" count, so showing everything by hand
@@ -1130,6 +1262,7 @@ function ToggleAll()
     local shownAgain = ToggleWorldNames()
     if shownAgain then
         -- Bringing names back always brings the interface back too.
+        DropChat()
         if uiHidden then UIParent:Show() end
         uiHiddenByAddon, escPending = false, false
     elseif db.quickTarget == "target_all" then
@@ -1350,6 +1483,7 @@ local function UpdateEscape(now)
         escPending = false
         if not UIParent:IsShown() then return end
         uiHiddenByAddon = false
+        DropChat()
         ToggleAll()
         mod.db.autoReason = nil
         lastActive = now
@@ -1364,6 +1498,7 @@ function UpdateAutoRules(now)
     if mod.db then
         UpdateIdle(now)
         UpdateEscape(now)
+        UpdateChatWhileHidden()
     end
 end
 
@@ -1432,16 +1567,15 @@ function mod.BuildOptions(parent, y)
     local levelOn = function() return db().cursorName and db().showLevel end
 
     add(ns.CreateCheck(parent, L.enabled, y,
-        function() return db().enabled end, function(v) mod.SetEnabled(v) end))
+        function() return db().enabled end, function(v) mod.SetEnabled(v); refreshAll() end, { master = true }))
     y = y - 40
 
     -- Name at the cursor
     ns.CreateSection(parent, L.nm_secName, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_nameNote, y) - 12
     add(ns.CreateCheck(parent, L.nm_cursorName, y,
         function() return db().cursorName end, set("cursorName"),
-        { tooltip = L.nm_cursorName_tip }))
+        { tooltip = L.nm_nameNote .. " " .. L.nm_cursorName_tip }))
     y = y - 34
     add(ns.CreateSlider(parent, L.nm_size, y,
         function() return db().size end,
@@ -1450,7 +1584,7 @@ function mod.BuildOptions(parent, y)
     y = y - 32
     add(ns.CreateDropdown(parent, L.nm_position, y, POSITIONS,
         function() return db().position end,
-        function(v) db().position = v; PlaceText() end, { enabledIf = nameOn }))
+        function(v) db().position = v; PlaceText() end, { enabledIf = nameOn, tooltip = L.nm_note }))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_delay, y,
         function() return db().delay end, set("delay"), 0, 10, 1,
@@ -1492,7 +1626,7 @@ function mod.BuildOptions(parent, y)
         for col, key in ipairs(row) do
             add(ns.CreateCheck(parent, L["nm_" .. key], y,
                 function() return db()[key] end, set(key),
-                { x = col == 1 and COL1 or COL2, width = WIDTH,
+                { x = col == 1 and COL1 or COL2, width = WIDTH, grid = true,
                   tooltip = L["nm_" .. key .. "_tip"] ~= "nm_" .. key .. "_tip" and L["nm_" .. key .. "_tip"] or nil,
                   enabledIf = nameOn }))
         end
@@ -1503,12 +1637,11 @@ function mod.BuildOptions(parent, y)
     -- Objects
     ns.CreateSection(parent, L.nm_secObjects, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_objectsNote, y) - 12
     for i, key in ipairs({ "objHerbs", "objOre", "objOther" }) do
         local col = (i - 1) % 2
         add(ns.CreateCheck(parent, L["nm_" .. key], y,
             function() return db()[key] end, set(key),
-            { x = col == 0 and COL1 or COL2, width = WIDTH,
+            { x = col == 0 and COL1 or COL2, width = WIDTH, grid = true,
               tooltip = L["nm_" .. key .. "_tip"], enabledIf = nameOn }))
         if col == 1 or i == 3 then y = y - 28 end
     end
@@ -1526,7 +1659,7 @@ function mod.BuildOptions(parent, y)
             local tip = L["nm_" .. key .. "_tip"]
             add(ns.CreateCheck(parent, L["nm_" .. key], y,
                 function() return db()[key] end, set(key),
-                { x = col == 1 and COL1 or COL2, width = WIDTH,
+                { x = col == 1 and COL1 or COL2, width = WIDTH, grid = true,
                   tooltip = tip ~= "nm_" .. key .. "_tip" and tip or nil,
                   enabledIf = nameOn }))
         end
@@ -1537,7 +1670,6 @@ function mod.BuildOptions(parent, y)
     -- Names above heads
     ns.CreateSection(parent, L.nm_secWorld, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_worldNote, y) - 14
     local notHidden = function() return not NamesHidden() end
     local shown = {}
     for _, option in ipairs(WORLD_NAMES) do
@@ -1549,7 +1681,7 @@ function mod.BuildOptions(parent, y)
         add(ns.CreateCheck(parent, L["nm_" .. option.key], y,
             function() return OptionOn(option) end,
             function(v) SetOption(option, v); refreshAll() end,
-            { x = col == 0 and COL1 or COL2, width = WIDTH,
+            { x = col == 0 and COL1 or COL2, width = WIDTH, grid = true,
               tooltip = tip ~= "nm_" .. option.key .. "_tip" and tip or nil,
               enabledIf = notHidden }))
         if col == 1 or i == #shown then y = y - 28 end
@@ -1559,36 +1691,46 @@ function mod.BuildOptions(parent, y)
     -- Quick toggle
     ns.CreateSection(parent, L.nm_secQuick, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_quickNote, y) - 14
     add(ns.CreateDropdown(parent, L.nm_quickTarget, y, { "target_names", "target_all" },
         function() return db().quickTarget end, set("quickTarget"),
-        { tooltip = L.nm_quickTarget_tip }))
+        { tooltip = L.nm_quickNote .. " " .. L.nm_quickTarget_tip }))
     y = y - 36
     local toggleButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     toggleButton:SetSize(220, 24)
     toggleButton:SetPoint("TOPLEFT", 20, y)
     toggleButton:SetScript("OnClick", function() ManualToggle() end)
+    toggleButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(self:GetText() or "", 1, 0.82, 0)
+        GameTooltip:AddLine(L.nm_toggleNote, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    toggleButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - 30
-    local stateNote = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    local stateNote = parent:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     stateNote:SetPoint("TOPLEFT", 18, y)
     stateNote:SetWidth(380)
     stateNote:SetJustifyH("LEFT")
+    -- Room for its text while names are hidden, so the next section never overlaps it.
+    stateNote:SetText(L.nm_hiddenNote)
+    local stateHeight = math.ceil(stateNote:GetStringHeight())
     add(function()
+        toggleButton:SetEnabled(db().enabled)
         if NamesHidden() then
             toggleButton:SetText(L.nm_showAgain)
-            stateNote:SetText(L.nm_hiddenNote .. " " .. L.nm_toggleNote)
+            stateNote:SetText(L.nm_hiddenNote)
         else
             toggleButton:SetText(L.nm_hideAll)
-            stateNote:SetText(L.nm_toggleNote)
+            stateNote:SetText("")
         end
     end)
-    y = y - 34
+    y = y - stateHeight - ns.NOTE_GAP
 
     ns.CreateSection(parent, L.nm_secButton, y)
     y = y - 32
     add(ns.CreateCheck(parent, L.nm_showButton, y,
         function() return db().showButton end, set("showButton"),
-        { tooltip = L.nm_showButton_tip }))
+        { tooltip = L.nm_showButton_tip .. " " .. L.nm_moveNote }))
     y = y - 34
     local buttonOn = function() return db().showButton end
     add(ns.CreateDropdown(parent, L.nm_buttonStyle, y, { "style_eye", "style_spell" },
@@ -1619,22 +1761,20 @@ function mod.BuildOptions(parent, y)
         db().buttonPoint = nil
         ApplyToggleLayout()
     end)
+    add(function() reset:SetEnabled(db().enabled and buttonOn()) end)
     y = y - 28
-    ns.CreateNote(parent, L.nm_moveNote, y)
-    y = y - 34
 
     -- Hide automatically
     ns.CreateSection(parent, L.nm_secAuto, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_autoNote, y) - 12
     add(ns.CreateCheck(parent, L.nm_autoAfk, y,
         function() return db().autoAfk end,
         function(v) db().autoAfk = v; UpdateAfk(); refreshAll() end,
-        { tooltip = L.nm_autoAfk_tip }))
+        { tooltip = L.nm_autoAfk_tip .. " " .. L.nm_autoNote }))
     y = y - 28
     add(ns.CreateCheck(parent, L.nm_autoIdle, y,
         function() return db().autoIdle end, set("autoIdle"),
-        { tooltip = L.nm_autoIdle_tip }))
+        { tooltip = L.nm_autoIdle_tip .. " " .. L.nm_autoNote }))
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_autoIdleTime, y,
         function() return db().autoIdleTime end, set("autoIdleTime"), 10, 300, 10, " s",
@@ -1653,7 +1793,6 @@ function mod.BuildOptions(parent, y)
     -- Tooltip
     ns.CreateSection(parent, L.nm_secTooltip, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.nm_tooltipSecNote, y) - 12
     add(ns.CreateCheck(parent, L.nm_tooltipCursor, y,
         function() return db().tooltipCursor end, set("tooltipCursor"),
         { tooltip = L.nm_tooltipCursor_tip }))
@@ -1664,18 +1803,15 @@ function mod.BuildOptions(parent, y)
     y = y - 32
     add(ns.CreateStepper(parent, L.nm_tooltipDelay, y,
         function() return db().tooltipDelay end, set("tooltipDelay"), 0, 10, 1,
-        function(v) return string.format("%.1f s", v / 10) end))
+        function(v) return string.format("%.1f s", v / 10) end, { tooltip = L.nm_tooltipNote }))
     y = y - 28
-    ns.CreateNote(parent, L.nm_tooltipNote, y)
-    y = y - 40
-
-    ns.CreateNote(parent, L.nm_note, y)
 
     optionRefreshers[#optionRefreshers + 1] = refreshAll
     return refreshAll
 end
 
 function mod.Command(cmd)
+    if cmd == "chat" then PrintChatDebug(); return true end
     if cmd == "togglenames" then
         local result = ManualToggle()
         if result == true then

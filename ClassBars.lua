@@ -9,8 +9,8 @@ local ADDON_NAME, ns = ...
 
 ns.AddLocale("en", {
     tab_bars = "Class bars",
-    bars_title = "Class Bars",
-    bars_stance = "Stance Bar", bars_pet = "Pet Bar", bars_possess = "Possess Bar", bars_totem = "Totem Bar",
+    bars_title = "Class bars",
+    bars_stance = "Stance bar", bars_pet = "Pet bar", bars_possess = "Possess bar", bars_totem = "Totem bar",
     bars_note = "Keybinds always work. Changes made in combat apply when it ends.",
 })
 ns.AddLocale("es", {

@@ -47,7 +47,7 @@ ns.AddLocale("en", {
     later = "Later",
     help = "Help",
     tab_general = "General",
-    generalTitle = "General Options",
+    generalTitle = "General options",
     page_bars = "Bars",
     page_frames = "Frames",
     sec_modules = "Modules",
@@ -66,9 +66,9 @@ ns.AddLocale("en", {
     prof_char = "Character: %s",
     prof_accountWide = "Use account-wide settings",
     prof_accountWide_tip = "On: this character shares its settings with every character that has this on. "
-        .. "Off: it keeps its own, starting as a copy of the account-wide ones (which stay as they are).",
+        .. "Off: it keeps its own, starting as a copy of the account-wide ones (which stay as they are). The interface reloads.",
     prof_copy = "Copy settings from",
-    prof_copy_tip = "Replaces this character's settings with a copy of the ones you pick. This character then uses its own settings.",
+    prof_copy_tip = "Replaces this character's settings with a copy of the ones you pick. This character then uses its own settings. The interface reloads.",
     prof_choose = "Choose...",
     prof_account = "Account-wide settings",
     prof_noneOther = "No other character has its own settings yet",
@@ -93,7 +93,12 @@ ns.AddLocale("en", {
         .. "5. Save the file and restart the game.",
     helpCopy = "Click the box and press Ctrl+C to copy the command.",
     helpFooter = "If the addon doesn't load you can't open this window, so these steps are also in README.txt inside the addon folder.",
-    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv groups, /uiv options, /uiv help, /uiv status, /uiv togglenames",
+    commands = "commands: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv groups, /uiv options, /uiv help, /uiv status, /uiv perf, /uiv togglenames",
+    perf_none = "nothing measured yet. Try again in a few seconds.",
+    perf_head = "%d updates in %.0f s (%.1f a second). Time per update, average and longest:",
+    perf_line = "  %s: %.3f ms, longest %.2f ms%s",
+    perf_total = "Total: %.3f ms per update, %.1f ms per second. Counting again from now.",
+    st_offShort = "off",
 })
 ns.AddLocale("es", {
     loaded = "activo. Escribe /uiv para abrir las opciones.",
@@ -127,9 +132,9 @@ ns.AddLocale("es", {
     prof_char = "Personaje: %s",
     prof_accountWide = "Usar la configuración de la cuenta",
     prof_accountWide_tip = "Activado: este personaje comparte su configuración con todos los personajes que lo tengan activado. "
-        .. "Desactivado: tiene la suya propia, que empieza como copia de la de la cuenta (que queda igual).",
+        .. "Desactivado: tiene la suya propia, que empieza como copia de la de la cuenta (que queda igual). La interfaz se recarga.",
     prof_copy = "Copiar configuración de",
-    prof_copy_tip = "Reemplaza la configuración de este personaje por una copia de la que elijas. El personaje pasa a usar su configuración propia.",
+    prof_copy_tip = "Reemplaza la configuración de este personaje por una copia de la que elijas. El personaje pasa a usar su configuración propia. La interfaz se recarga.",
     prof_choose = "Elegir...",
     prof_account = "Configuración de la cuenta",
     prof_noneOther = "Ningún otro personaje tiene configuración propia todavía",
@@ -154,7 +159,12 @@ ns.AddLocale("es", {
         .. "5. Guarda el archivo y reinicia el juego.",
     helpCopy = "Haz clic en el recuadro y presiona Ctrl+C para copiar el comando.",
     helpFooter = "Si el addon no carga no podrás abrir esta ventana, así que estos pasos también están en README.txt dentro de la carpeta del addon.",
-    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv grupos, /uiv opciones, /uiv ayuda, /uiv estado, /uiv togglenames",
+    commands = "comandos: /uiv, /uiv prd, /uiv xp, /uiv bars, /uiv actionbars, /uiv unitframes, /uiv interface, /uiv minimap, /uiv names, /uiv grupos, /uiv opciones, /uiv ayuda, /uiv estado, /uiv perf, /uiv togglenames",
+    perf_none = "todavía no hay nada medido. Inténtalo en unos segundos.",
+    perf_head = "%d actualizaciones en %.0f s (%.1f por segundo). Tiempo por actualización, promedio y máximo:",
+    perf_line = "  %s: %.3f ms, máximo %.2f ms%s",
+    perf_total = "Total: %.3f ms por actualización, %.1f ms por segundo. Se vuelve a contar desde ahora.",
+    st_offShort = "desactivado",
 })
 
 function ns.Print(msg) print(ns.PREFIX .. msg) end
@@ -180,6 +190,12 @@ end
 
 -- Some frames answer with "secret" values that addons can't test (for
 -- example parts of the target frame). This tells if a value is one of them.
+-- Whether another addon is loaded (for options that need it).
+function ns.IsAddOnLoaded(name)
+    if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(name) and true or false end
+    return IsAddOnLoaded and IsAddOnLoaded(name) and true or false
+end
+
 function ns.IsSecret(v)
     return issecretvalue ~= nil and issecretvalue(v)
 end
@@ -238,6 +254,65 @@ end
 -- Option widgets shared by the modules
 ---------------------------------------------------------------------------
 -- Shows an explanation when the mouse is over a label (a FontString).
+-- Options shared by every control (checkbox, stepper, slider, dropdown):
+--   opts.x: where the label starts (indented under the option it depends on).
+--   opts.enabledIf: function; while it returns false the control is greyed
+--   out and can't be used.
+local function LabelColor(fs, on)
+    if on then fs:SetTextColor(1, 1, 1) else fs:SetTextColor(0.5, 0.5, 0.5) end
+end
+
+local function IsOn(opts)
+    return not (opts and opts.enabledIf) or (opts.enabledIf() and true or false)
+end
+
+---------------------------------------------------------------------------
+-- Option rows
+---------------------------------------------------------------------------
+-- Every option is a row: its name on the left, its control (checkbox,
+-- dropdown, slider, - / + buttons) in one column at ns.CONTROL_X, so the eye
+-- goes straight down. An option that depends on the one above is indented,
+-- with a thin tree line to it (level 1, or 2 under that). Checkbox grids
+-- (opts.grid) keep the checkbox-then-name layout.
+ns.CONTROL_X = 320
+local LABEL_X = 20
+local INDENT_STEP = 18
+
+-- Level of a row: opts.level, or from the old opts.x positions (40 = 1, 64 = 2).
+local function RowLevel(opts)
+    if opts and opts.level then return opts.level end
+    local x = opts and opts.x
+    if not x or x <= 24 then return 0 end
+    if x <= 52 then return 1 end
+    return 2
+end
+
+-- The name of a row, cut to fit before the control column. Returns the font
+-- string and where it starts.
+function ns.RowLabel(parent, label, y, opts)
+    local level = RowLevel(opts)
+    local x = LABEL_X + level * INDENT_STEP
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    fs:SetPoint("TOPLEFT", x, y)
+    fs:SetWidth(ns.CONTROL_X - 12 - x)
+    fs:SetJustifyH("LEFT")
+    fs:SetWordWrap(false)
+    fs:SetText(label)
+    if level > 0 then
+        -- Tree line: down from the row above, then across to this name.
+        local lineX = x - INDENT_STEP + 5
+        local down = parent:CreateTexture(nil, "ARTWORK")
+        down:SetColorTexture(0.6, 0.6, 0.6, 0.5)
+        down:SetSize(1, 26)
+        down:SetPoint("TOPLEFT", lineX, y + 19)
+        local across = parent:CreateTexture(nil, "ARTWORK")
+        across:SetColorTexture(0.6, 0.6, 0.6, 0.5)
+        across:SetSize(INDENT_STEP - 8, 1)
+        across:SetPoint("TOPLEFT", lineX, y - 7)
+    end
+    return fs, x
+end
+
 function ns.AttachTooltip(parent, fontString, title, tip)
     if not tip then return end
     local hover = CreateFrame("Frame", nil, parent)
@@ -258,7 +333,30 @@ end
 --   tooltip  explanation shown when the mouse is over the option
 --   enabledIf function; while it returns false the option is grayed out
 function ns.CreateCheck(parent, label, y, getter, setter, opts)
-    opts = opts or {}
+    opts = ns.ModuleRule(opts)
+    if not opts.grid then
+        -- Row: name on the left, checkbox in the control column. The whole row is clickable.
+        local text, labelX = ns.RowLabel(parent, label, y, opts)
+        local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+        cb:SetPoint("TOPLEFT", ns.CONTROL_X - 4, y + 6)
+        cb:SetSize(26, 26)
+        cb:SetHitRectInsets(-(ns.CONTROL_X - 4 - labelX), 0, 0, 0)
+        cb:SetScript("OnClick", function(self) setter(self:GetChecked() and true or false) end)
+        cb:SetScript("OnEnter", function(self)
+            if not opts.tooltip then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(label, 1, 0.82, 0)
+            GameTooltip:AddLine(opts.tooltip, 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return function()
+            cb:SetChecked(getter())
+            local on = IsOn(opts)
+            cb:SetEnabled(on)
+            LabelColor(text, on)
+        end
+    end
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", opts.x or 16, y)
     cb:SetSize(26, 26)
@@ -295,8 +393,9 @@ function ns.CreateCheck(parent, label, y, getter, setter, opts)
     end
 end
 
+-- A small heading inside a section (gray, so it reads below a section title).
 function ns.CreateHeader(parent, text, y)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     fs:SetPoint("TOPLEFT", 18, y)
     fs:SetText(text)
 end
@@ -360,21 +459,26 @@ function ns.CreateModuleTitle(parent, text, y)
 end
 
 -- A section title with a thin line under it. Takes about 30 pixels.
+-- A section title: gold, regular size, over a faint line.
 function ns.CreateSection(parent, text, y)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    fs:SetPoint("TOPLEFT", 16, y)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("TOPLEFT", 16, y - 2)
     fs:SetText(text)
     local line = parent:CreateTexture(nil, "ARTWORK")
-    line:SetColorTexture(1, 0.82, 0, 0.25)
+    line:SetColorTexture(1, 0.82, 0, 0.12)
     line:SetHeight(1)
-    line:SetPoint("TOPLEFT", 16, y - 20)
+    line:SetPoint("TOPLEFT", 16, y - 19)
     line:SetPoint("RIGHT", parent, "RIGHT", -16, 0)
 end
 
--- A small gray explanation. Returns its height, so the next option can go
--- right below it however many lines it takes.
+-- Space between a note and the row below it. The same everywhere; enough for
+-- a dropdown, which sits a little higher than its label.
+ns.NOTE_GAP = 20
+
+-- A gray explanation. Returns its height, so the next option can go right
+-- below it however many lines it takes (then subtract ns.NOTE_GAP).
 function ns.CreateNote(parent, text, y, width)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     fs:SetPoint("TOPLEFT", 18, y)
     fs:SetWidth(width or 380)
     fs:SetJustifyH("LEFT")
@@ -403,12 +507,13 @@ function ns.ModuleDescription(mod)
 end
 
 -- A row for the General tab: icon, name, description, Open button and the
--- checkbox that turns the module on or off. Takes 56 pixels.
+-- checkbox that turns the module on or off. Takes 64 pixels: room for a
+-- description of two lines in the regular font.
 local function CreateModuleRow(parent, mod, y, index, onOpen)
     local row = CreateFrame("Frame", nil, parent)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, y)
     row:SetPoint("RIGHT", parent, "RIGHT", -8, 0)
-    row:SetHeight(52)
+    row:SetHeight(60)
 
     local band = row:CreateTexture(nil, "BACKGROUND")
     band:SetAllPoints()
@@ -437,7 +542,7 @@ local function CreateModuleRow(parent, mod, y, index, onOpen)
     title:SetJustifyH("LEFT")
     title:SetText(L[mod.titleKey])
 
-    local desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
     desc:SetPoint("RIGHT", open, "LEFT", -8, 0)
     desc:SetJustifyH("LEFT")
@@ -448,26 +553,28 @@ local function CreateModuleRow(parent, mod, y, index, onOpen)
     return function() check:SetChecked(mod.db.enabled) end
 end
 
--- Options shared by the stepper, slider and dropdown:
---   opts.x: where the label starts (indented under the option it depends on).
---   opts.enabledIf: function; while it returns false the control is greyed
---   out and can't be used.
-local function LabelColor(fs, on)
-    if on then fs:SetTextColor(1, 1, 1) else fs:SetTextColor(0.5, 0.5, 0.5) end
-end
-
-local function IsOn(opts)
-    return not (opts and opts.enabledIf) or (opts.enabledIf() and true or false)
+-- While a module's page is built (ns.buildingModule), every option on it is
+-- greyed out when that module is off, except the module's own Enabled
+-- checkbox (opts.master). Returns opts with that rule added.
+function ns.ModuleRule(opts)
+    opts = opts or {}
+    local mod = ns.buildingModule
+    if mod and not opts.master and not opts.moduleRule then
+        local inner = opts.enabledIf
+        opts.enabledIf = function() return mod.db.enabled and (not inner or inner()) end
+        opts.moduleRule = true
+    end
+    return opts
 end
 
 function ns.CreateStepper(parent, label, y, getter, setter, minV, maxV, step, suffix, opts)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
-    text:SetText(label)
+    opts = ns.ModuleRule(opts)
+    local text = ns.RowLabel(parent, label, y, opts)
     ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
+    -- - [value] + starting at the control column.
     local value = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    value:SetPoint("TOPLEFT", 250, y)
+    value:SetPoint("TOPLEFT", ns.CONTROL_X + 26, y)
     value:SetJustifyH("CENTER")
     value:SetWidth(44)
 
@@ -509,9 +616,10 @@ end
 -- (MinimalSliderWithSteppersTemplate); if this client doesn't have it,
 -- falls back to the - / + stepper. "format" turns a value into its label.
 function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format, opts)
+    opts = ns.ModuleRule(opts)
     local ok, refresh = pcall(function()
         local slider = CreateFrame("Frame", nil, parent, "MinimalSliderWithSteppersTemplate")
-        slider:SetPoint("TOPLEFT", 180, y + 6)
+        slider:SetPoint("TOPLEFT", ns.CONTROL_X - 6, y + 6)
         slider:SetWidth(200)
         local formatters = {
             [MinimalSliderWithSteppersMixin.Label.Right] =
@@ -522,15 +630,16 @@ function ns.CreateSlider(parent, label, y, getter, setter, minV, maxV, format, o
             setter(math.floor(value + 0.5))
         end, slider)
 
-        local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
-        text:SetText(label)
+        local text = ns.RowLabel(parent, label, y, opts)
         ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
         return function()
             slider:SetValue(getter())
             local on = IsOn(opts)
             if slider.SetEnabled then pcall(slider.SetEnabled, slider, on) end
             LabelColor(text, on)
+            -- The value next to the slider greys out with it.
+            local value = slider.RightText or (slider.Label and slider.Label.Right)
+            if value and value.SetTextColor then LabelColor(value, on) end
         end
     end)
     if ok then return refresh end
@@ -544,15 +653,14 @@ end
 local optionDropdownCount = 0
 
 function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", (opts and opts.x) or 20, y)
-    text:SetText(label)
+    opts = ns.ModuleRule(opts)
+    local text = ns.RowLabel(parent, label, y, opts)
     ns.AttachTooltip(parent, text, label, opts and opts.tooltip)
 
     local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     if ok and dropdown and dropdown.SetupMenu then
         dropdown:SetWidth(170)
-        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        dropdown:SetPoint("TOPLEFT", ns.CONTROL_X, y + 6)
         dropdown:SetupMenu(function(_, root)
             for _, value in ipairs(values) do
                 root:CreateRadio(L[value],
@@ -570,7 +678,7 @@ function ns.CreateDropdown(parent, label, y, values, getter, setter, opts)
 
     optionDropdownCount = optionDropdownCount + 1
     local legacy = CreateFrame("Frame", "UIVisibilityOptionDropdown" .. optionDropdownCount, parent, "UIDropDownMenuTemplate")
-    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    legacy:SetPoint("TOPLEFT", ns.CONTROL_X - 16, y + 8)
     UIDropDownMenu_SetWidth(legacy, 160)
     UIDropDownMenu_Initialize(legacy, function()
         for _, value in ipairs(values) do
@@ -645,12 +753,40 @@ local function DeepCopy(t)
 end
 ns.DeepCopy = DeepCopy
 
+local function RealmName()
+    for _, get in ipairs({ GetRealmName, GetNormalizedRealmName }) do
+        local ok, realm = pcall(get)
+        if ok and type(realm) == "string" and not ns.IsSecret(realm) and realm ~= "" then return realm end
+    end
+    return nil
+end
+
+-- "Name - Realm", or "Name - ?" while the realm isn't known yet (it can be
+-- missing when the settings load; FixCharKey renames it at login).
 local function CharKey()
     local name = UnitName("player")
     if type(name) ~= "string" or ns.IsSecret(name) or name == "" then return nil end
-    local realm = GetRealmName and GetRealmName()
-    if type(realm) ~= "string" or ns.IsSecret(realm) or realm == "" then realm = "?" end
-    return name .. " - " .. realm
+    return name .. " - " .. (RealmName() or "?")
+end
+
+-- At login the realm is known: an entry saved as "Name - ?" gets its real name.
+local function FixCharKey()
+    local key = ns.charKey
+    if not key or not key:find(" %- %?$") then return end
+    local realm = RealmName()
+    if not realm then return end
+    local newKey = key:gsub(" %- %?$", " - " .. realm)
+    local chars = UIVisibilityDB.chars
+    if chars[newKey] == nil then
+        chars[newKey] = chars[key]
+        chars[key] = nil
+    end
+    ns.charKey = newKey
+end
+
+-- What the options show: the realm only when it's known.
+local function CharDisplayName()
+    return ns.charKey and (ns.charKey:gsub(" %- %?$", "")) or "?"
 end
 
 local function InitDB()
@@ -747,7 +883,7 @@ end
 
 local function CopySettingsFrom(source)
     if not ns.charKey then return end
-    local name = source == "account" and L.prof_account or source
+    local name = source == "account" and L.prof_account or (source:gsub(" %- %?$", ""))
     ConfirmReload(string.format(L.prof_copyAsk, name), function()
         local copy = CopyOf(source)
         if not copy then return end
@@ -761,9 +897,7 @@ end
 -- "Copy settings from": a menu of sources, not a choice that stays shown.
 local copyDropdownCount = 0
 local function CreateCopyDropdown(parent, y)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", 20, y)
-    text:SetText(L.prof_copy)
+    local text = ns.RowLabel(parent, L.prof_copy, y)
     ns.AttachTooltip(parent, text, L.prof_copy, L.prof_copy_tip)
 
     local function Sources()
@@ -772,12 +906,12 @@ local function CreateCopyDropdown(parent, y)
         for _, key in ipairs(OtherCharacters()) do list[#list + 1] = key end
         return list
     end
-    local function Name(source) return source == "account" and L.prof_account or source end
+    local function Name(source) return source == "account" and L.prof_account or (source:gsub(" %- %?$", "")) end
 
     local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     if ok and dropdown and dropdown.SetupMenu then
         dropdown:SetWidth(170)
-        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        dropdown:SetPoint("TOPLEFT", ns.CONTROL_X, y + 6)
         if dropdown.SetDefaultText then pcall(dropdown.SetDefaultText, dropdown, L.prof_choose) end
         dropdown:SetupMenu(function(_, root)
             local sources = Sources()
@@ -799,7 +933,7 @@ local function CreateCopyDropdown(parent, y)
 
     copyDropdownCount = copyDropdownCount + 1
     local legacy = CreateFrame("Frame", "UIVisibilityCopyDropdown" .. copyDropdownCount, parent, "UIDropDownMenuTemplate")
-    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    legacy:SetPoint("TOPLEFT", ns.CONTROL_X - 16, y + 8)
     UIDropDownMenu_SetWidth(legacy, 160)
     UIDropDownMenu_Initialize(legacy, function()
         local sources = Sources()
@@ -956,14 +1090,16 @@ local function CreateLanguageDropdown(parent, label)
 end
 
 local function CreateBottomButtons(parent, anchorPoint, x, y)
-    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    label:SetPoint(anchorPoint, x, y + 6)
-    label:SetText(L.languageLabel)
-    CreateLanguageDropdown(parent, label)
+    -- A row like the others: name on the left, dropdown in the control column.
+    ns.RowLabel(parent, (L.languageLabel:gsub(":%s*$", "")), y)
+    local anchor = CreateFrame("Frame", nil, parent)
+    anchor:SetSize(1, 13)
+    anchor:SetPoint("TOPLEFT", ns.CONTROL_X - 9, y)
+    CreateLanguageDropdown(parent, anchor)
 
     local helpButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     helpButton:SetSize(86, 24)
-    helpButton:SetPoint("LEFT", label, "LEFT", 220, 0)
+    helpButton:SetPoint("LEFT", anchor, "RIGHT", 140, 0)
     helpButton:SetText(L.help)
     helpButton:SetScript("OnClick", ns.ShowHelp)
 end
@@ -1014,13 +1150,13 @@ end
 local function BuildGeneral(parent, y, openModule)
     local refreshers = {}
 
-    y = y - ns.CreateNote(parent, L.generalIntro, y - 2) - 16
+    y = y - ns.CreateNote(parent, L.generalIntro, y - 2) - ns.NOTE_GAP
 
     ns.CreateSection(parent, L.sec_modules, y)
     y = y - 32
     for i, mod in ipairs(ns.moduleList) do
         refreshers[#refreshers + 1] = CreateModuleRow(parent, mod, y, i, openModule)
-        y = y - 56
+        y = y - 64
     end
     y = y - 12
 
@@ -1041,9 +1177,9 @@ local function BuildGeneral(parent, y, openModule)
     -- Settings for this character
     ns.CreateSection(parent, L.sec_profile, y)
     y = y - 30
-    local who = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local who = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     who:SetPoint("TOPLEFT", 20, y)
-    who:SetText(string.format(L.prof_char, ns.charKey or "?"))
+    who:SetText(string.format(L.prof_char, CharDisplayName()))
     y = y - 22
     local accountCheck
     accountCheck = ns.CreateCheck(parent, L.prof_accountWide, y,
@@ -1057,7 +1193,6 @@ local function BuildGeneral(parent, y, openModule)
     y = y - 32
     refreshers[#refreshers + 1] = CreateCopyDropdown(parent, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.prof_note, y) - 16
 
     ns.CreateSection(parent, L.sec_language, y)
     y = y - 42
@@ -1124,8 +1259,11 @@ local function BuildPage(page, parent, y)
     if #page.mods == 1 then
         local mod = page.mods[1]
         local desc = ns.ModuleDescription(mod)
-        if desc then y = y - ns.CreateNote(parent, desc, y - 2) - 14 end
-        return mod.BuildOptions(parent, y)
+        if desc then y = y - ns.CreateNote(parent, desc, y - 2) - ns.NOTE_GAP end
+        ns.buildingModule = mod
+        local refresh = mod.BuildOptions(parent, y)
+        ns.buildingModule = nil
+        return refresh
     end
     local refreshers, blocks = {}, {}
     for i, mod in ipairs(page.mods) do
@@ -1136,8 +1274,10 @@ local function BuildPage(page, parent, y)
         ns.CreateModuleTitle(block, L[mod.titleKey], -2)
         local top = -44
         local desc = ns.ModuleDescription(mod)
-        if desc then top = top - ns.CreateNote(block, desc, top) - 12 end
+        if desc then top = top - ns.CreateNote(block, desc, top) - ns.NOTE_GAP end
+        ns.buildingModule = mod
         refreshers[#refreshers + 1] = mod.BuildOptions(block, top)
+        ns.buildingModule = nil
         FitContent(block)
         y = y - block:GetHeight() - 20
         blocks[i] = block
@@ -1305,15 +1445,50 @@ end
 ---------------------------------------------------------------------------
 local lastEditMode = false
 
+-- Time each module takes on the fast tick, for /uiv perf.
+-- perf[key] = { ms = total milliseconds, max = longest tick }; since = when it started counting.
+local perf, perfSince, perfTicks = {}, GetTime(), 0
+
 local function Tick()
     local editMode = ns.IsEditMode()
     local editChanged = editMode ~= lastEditMode
     lastEditMode = editMode
     local now = GetTime()
+    local clock = debugprofilestop
+    perfTicks = perfTicks + 1
     for _, mod in ipairs(ns.moduleList) do
         if editChanged and mod.MarkDirty then mod.MarkDirty() end
-        if mod.OnTick then mod.OnTick(now) end
+        if mod.OnTick then
+            local t0 = clock and clock()
+            mod.OnTick(now)
+            if t0 then
+                local ms = clock() - t0
+                local p = perf[mod.key] or { ms = 0, max = 0 }
+                perf[mod.key] = p
+                p.ms = p.ms + ms
+                if ms > p.max then p.max = ms end
+            end
+        end
     end
+end
+
+-- /uiv perf: average and longest time per tick for each module since the
+-- last /uiv perf (or the login), then starts counting again.
+local function PrintPerf()
+    local seconds = GetTime() - perfSince
+    if perfTicks == 0 or seconds <= 0 then ns.Print(L.perf_none) return end
+    ns.Print(string.format(L.perf_head, perfTicks, seconds, perfTicks / seconds))
+    local total = 0
+    for _, mod in ipairs(ns.moduleList) do
+        local p = perf[mod.key]
+        if p then
+            total = total + p.ms
+            ns.Print(string.format(L.perf_line, L[mod.titleKey], p.ms / perfTicks, p.max,
+                mod.db.enabled and "" or (" (" .. L.st_offShort .. ")")))
+        end
+    end
+    ns.Print(string.format(L.perf_total, total / perfTicks, total / seconds))
+    perf, perfSince, perfTicks = {}, GetTime(), 0
 end
 
 local function SlowTick()
@@ -1346,6 +1521,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
         end
     elseif event == "PLAYER_LOGIN" then
         if not ns.db then InitDB() end
+        FixCharKey()
         for _, mod in ipairs(ns.moduleList) do
             if mod.OnLogin then mod.OnLogin() end
         end
@@ -1421,6 +1597,8 @@ SlashCmdList.UIVISIBILITY = function(msg)
         ns.ShowHelp()
     elseif cmd == "status" or cmd == "estado" then
         PrintAllStatus()
+    elseif cmd == "perf" then
+        PrintPerf()
     else
         for _, mod in ipairs(ns.moduleList) do
             if mod.Command and mod.Command(cmd, arg) then return end

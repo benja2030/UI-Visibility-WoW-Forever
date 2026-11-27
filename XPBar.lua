@@ -15,7 +15,7 @@ local BLIZZ_ADDON = "Blizzard_StatusTrackingBar"
 
 ns.AddLocale("en", {
     tab_xp = "XP bar",
-    xp_title = "Experience Bar",
+    xp_title = "Experience bar",
     xp_secShow = "Show the bar",
     xp_secHidden = "When hidden",
     xp_hover = "On mouse hover",
@@ -127,7 +127,7 @@ function mod.BuildOptions(parent, y)
     local function set(key) return function(v) mod.db[key] = v; dirty = true; refreshAll() end end
 
     add(ns.CreateCheck(parent, L.enabled, y,
-        function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
+        function() return mod.db.enabled end, function(v) mod.SetEnabled(v); refreshAll() end, { master = true }))
     y = y - 40
 
     ns.CreateSection(parent, L.xp_secShow, y)

@@ -519,6 +519,7 @@ end)
 function mod.BuildOptions(parent, y)
     local refreshers = {}
     local function add(r) refreshers[#refreshers + 1] = r end
+    local function refreshAll() for _, r in ipairs(refreshers) do r() end end
     local function set(fn) return function(v) fn(v); dirty = true end end
     local db = function() return mod.db end
     local function tip(key)
@@ -527,12 +528,11 @@ function mod.BuildOptions(parent, y)
     end
 
     add(ns.CreateCheck(parent, L.enabled, y,
-        function() return db().enabled end, function(v) mod.SetEnabled(v) end))
+        function() return db().enabled end, function(v) mod.SetEnabled(v); refreshAll() end, { master = true }))
     y = y - 40
 
     ns.CreateSection(parent, L.prd_secOpacity, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.prd_opacityNote, y) - 14
     for _, item in ipairs({
         { "prd_inCombat", "alphaCombat" }, { "prd_regen", "alphaRegen" }, { "prd_full", "alphaIdle" },
     }) do
@@ -544,7 +544,7 @@ function mod.BuildOptions(parent, y)
 
     ns.CreateSection(parent, L.prd_secTracked, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - 12
+    y = y - ns.CreateNote(parent, L.prd_trackedNote, y) - ns.NOTE_GAP
     local items = {
         { "prd_health", function() return db().health end, function(v) db().health = v end },
     }
@@ -555,14 +555,13 @@ function mod.BuildOptions(parent, y)
     for i, item in ipairs(items) do
         local col = (i - 1) % 2
         add(ns.CreateCheck(parent, L[item[1]], y, item[2], set(item[3]),
-            { x = col == 0 and 16 or 216, width = 160, tooltip = tip(item[1]) }))
+            { x = col == 0 and 16 or 216, width = 160, tooltip = tip(item[1]), grid = true }))
         if col == 1 or i == #items then y = y - 28 end
     end
     y = y - 12
 
     ns.CreateSection(parent, L.prd_secConditions, y)
     y = y - 30
-    y = y - ns.CreateNote(parent, L.prd_conditionsNote, y) - 16
     for _, list in ipairs({
         { "showWhen", "alphaShow", L.prd_showWhen, L.prd_alphaShowMenu, { 100, 90, 80, 70, 60, 50, 40, 30, 20, 10 } },
         { "hideWhen", "alphaHide", L.prd_hideWhen, L.prd_alphaHideMenu, { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90 } },
@@ -579,6 +578,7 @@ function mod.BuildOptions(parent, y)
             setAlpha = function(v) db()[alphaKey] = v; dirty = true end,
             alphaValues = list[5],
             alphaLabel = list[4],
+            tooltip = L.prd_conditionsNote,
         }))
         y = y - 34
     end

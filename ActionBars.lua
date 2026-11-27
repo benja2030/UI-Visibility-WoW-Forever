@@ -10,8 +10,8 @@ local ADDON_NAME, ns = ...
 
 ns.AddLocale("en", {
     tab_actionbars = "Action bars",
-    ab_title = "Action Bars",
-    ab_bar = "Action Bar %d",
+    ab_title = "Action bars",
+    ab_bar = "Action bar %d",
     ab_note = "Keybinds always work. Changes made in combat apply when it ends.",
 })
 ns.AddLocale("es", {
@@ -42,14 +42,14 @@ local L = ns.Lproxy
 local mod
 
 ns.AddLocale("en", {
-    ab_keepButtons = "Glowing buttons hide with their bar",
-    ab_keepButtons_tip = "Some addons, like Glowing Bars, make glowing buttons ignore their bar's opacity so they always show. "
-        .. "On: buttons on bars that UI Visibility hides or fades follow their bar, glow included. Bars set to Shown aren't affected.",
+    ab_keepButtons = "Hide glows too (needs Glowing Bars)",
+    ab_keepButtons_tip = "Glowing Bars makes glowing buttons show even on hidden bars. On: they hide and show with their bar, glow included. "
+        .. "Bars set to Shown aren't affected. Glowing Bars is available on CurseForge; without it, this option is greyed out.",
 })
 ns.AddLocale("es", {
-    ab_keepButtons = "Los botones brillantes se ocultan con su barra",
-    ab_keepButtons_tip = "Algunos addons, como Glowing Bars, hacen que los botones que brillan ignoren la opacidad de su barra para verse siempre. "
-        .. "Activado: los botones de barras que UI Visibility oculta o desvanece siguen a su barra, brillo incluido. Las barras en Visible no se ven afectadas.",
+    ab_keepButtons = "Ocultar brillos (necesita Glowing Bars)",
+    ab_keepButtons_tip = "Glowing Bars hace que los botones que brillan se vean incluso en barras ocultas. Activado: se ocultan y muestran con su barra, brillo incluido. "
+        .. "Las barras en Visible no se ven afectadas. Glowing Bars está disponible en CurseForge; sin él, esta opción aparece en gris.",
 })
 
 mod = ns.NewElementsModule({
@@ -57,11 +57,12 @@ mod = ns.NewElementsModule({
     noteKey = "ab_note",
     elements = elements,
     defaults = { enabled = true, linkHover = false, modes = modes, keepButtons = true },
-    extraOptions = function(parent, y, add, changed)
+    extraOptions = function(parent, y, add, changed, isOn)
         add(ns.CreateCheck(parent, L.ab_keepButtons, y,
             function() return mod.db.keepButtons end,
             function(v) mod.db.keepButtons = v; changed() end,
-            { tooltip = L.ab_keepButtons_tip, width = 360 }))
+            { tooltip = L.ab_keepButtons_tip, width = 400,
+              enabledIf = function() return isOn() and ns.IsAddOnLoaded("GlowingBars") end }))
         return y - 28
     end,
 })

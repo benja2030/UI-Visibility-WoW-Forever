@@ -32,7 +32,7 @@ Zone text, clock, calendar, tracking, mail, addon button, compass border, day/ni
 - **Name at the cursor**: While you hover a player or NPC, their name shows in big letters next to the cursor, in the game's name colors, at any distance. It can also show their level (colored by difficulty, and optionally not on friendly NPCs), the title of friendly NPCs under their name (like <Food & Drink Vendor>), and a quest mark when they're part of one of your active quests.
 - You choose who it's for (allied players, enemy players, friendly NPCs, hostile NPCs) and when to hide it (in combat, in an instance, on dead characters, on characters close enough to have a nameplate, or over the interface).
 - **Tooltip**: The tooltip can show next to the cursor instead of in the corner, bigger, and after a short delay.
-- **Names above heads**: Turn the game's own names above heads on or off by category (allied and enemy players, hostile, interactive and special NPCs, pets, guardians and minions, totems, critters, your own name, weak enemies, guild names and titles). One button, or `/uiv togglenames` in a macro, hides them all and brings them back exactly as they were. It can hide only the names, or the names and the whole interface (like Alt+Z), by hand or automatically while you're away or after some time out of combat. That button can also sit on your screen, always visible or only on mouse hover. Names never stay hidden after the game closes: they're put back when you log out or reload, and if the game crashes while they're hidden, they're shown again at your next login.
+- **Names above heads**: Turn the game's own names above heads on or off by category (allied and enemy players, hostile, interactive and special NPCs, pets, guardians and minions, totems, critters, your own name, weak enemies, guild names and titles). One button, or `/uiv togglenames` in a macro, hides them all and brings them back exactly as they were. It can hide only the names, or the names and the whole interface (like Alt+Z), by hand or automatically while you're away or after some time out of combat. That button can also sit on your screen, always visible or only on mouse hover. While everything is hidden, the chat shows while you type (press Enter) and hides again when you're done. Names never stay hidden after the game closes: they're put back when you log out or reload, and if the game crashes while they're hidden, they're shown again at your next login.
 
 ### Shown, Hidden or Show when
 
@@ -44,11 +44,11 @@ In the Action bars, Class bars, Unit frames, Interface and Minimap modules, ever
   - Mouse over it, in combat, out of combat, I have a target, my target is an enemy, in a group, in an instance, resting (inn or city), mounted, flying, swimming, moving, standing still, dragging a spell or item.
   - Two opacities in the same menu: **when shown** (100% by default) and **otherwise** (0% by default). For example, a bar at 50% that goes to 100% when you hover it.
   - While it's invisible it can't be clicked, so you can't press a hidden ability by mistake. Keybinds always work.
-  - In combat, the game doesn't let addons change what can be clicked, so it's decided when combat starts: what's visible then (or appears because you're in combat) can be clicked. With **Invisible elements can't be clicked in combat** (on by default), anything invisible when combat starts stays unclickable until it ends, even if it shows on hover. Turn it off to keep those clickable during the fight.
+  - In combat, the game doesn't let addons change what can be clicked, so it's decided when combat starts: what's visible then (or appears because you're in combat) can be clicked. With **No clicks on invisible elements in combat** (on by default), anything invisible when combat starts stays unclickable until it ends, even if it shows on hover. Turn it off to keep those clickable during the fight.
 
 Settings from older versions are kept: **On hover** is now Show when with **Mouse over it** ticked.
 
-**Glowing buttons hide with their bar** (Action bars, on by default): some addons, like Glowing Bars, make glowing buttons ignore their bar's opacity so they always show. With this on, buttons on bars that UI Visibility hides or fades follow their bar, glow included. Bars set to Shown aren't affected.
+**Hide glows too** (Action bars, needs Glowing Bars, on by default): some addons, like Glowing Bars, make glowing buttons ignore their bar's opacity so they always show. With this on, buttons on bars that UI Visibility hides or fades follow their bar, glow included. Bars set to Shown aren't affected.
 
 **Live Portraits**: if you use it, its 3D portraits hide together with their unit frame. Nothing to set up.
 
@@ -106,6 +106,7 @@ Options are in **Options > AddOns > UI Visibility**, and in a window with the sa
 - `/uiv options`: Opens the pages in the game's Options menu
 - `/uiv help`: Opens the help window
 - `/uiv status`: Shows the state of every module
+- `/uiv perf`: Shows how long each module takes per update, to check its impact on performance
 - `/uiv debug`: Personal Resource Display timing details
 - `/uiv list`: Lists the addon minimap buttons found
 - `/uiv add Name`: Adds an addon minimap button that wasn't found
@@ -170,7 +171,7 @@ Texto de zona, reloj, calendario, rastreo, correo, botón de addons, borde de br
 - **Nombre junto al cursor**: Mientras apuntas a un jugador o PNJ, su nombre aparece en grande junto al cursor, con los colores de nombre del juego, a cualquier distancia. También puede mostrar su nivel (coloreado por dificultad, y si quieres no en los PNJ amistosos), el título de los PNJ amistosos bajo su nombre (como <Vendedor de comida y bebida>) y una marca de misión cuando es parte de una de tus misiones activas.
 - Eliges para quién (jugadores aliados, jugadores enemigos, PNJ amistosos, PNJ hostiles) y cuándo ocultarlo (en combate, en instancias, en personajes muertos, en personajes con placa de nombre visible, o sobre la interfaz).
 - **Tooltip**: El tooltip puede aparecer junto al cursor en vez de en la esquina, más grande y con un pequeño retraso.
-- **Nombres sobre la cabeza**: Activa o desactiva por categoría los nombres que el juego muestra sobre la cabeza (jugadores aliados y enemigos, PNJ hostiles, interactivos y especiales, mascotas, guardianes y esbirros, tótems, criaturas, tu propio nombre, enemigos menores, hermandad y títulos). Un botón, o `/uiv togglenames` en una macro, los oculta todos y los vuelve a mostrar exactamente como estaban. Puede ocultar solo los nombres, o los nombres y toda la interfaz (como Alt+Z), a mano o automáticamente mientras estás ausente o tras un tiempo fuera de combate. Ese botón también puede estar en tu pantalla, siempre visible o solo al pasar el mouse. Los nombres nunca quedan ocultos después de cerrar el juego: se devuelven al salir o recargar, y si el juego se cae mientras están ocultos, se muestran de nuevo al volver a entrar.
+- **Nombres sobre la cabeza**: Activa o desactiva por categoría los nombres que el juego muestra sobre la cabeza (jugadores aliados y enemigos, PNJ hostiles, interactivos y especiales, mascotas, guardianes y esbirros, tótems, criaturas, tu propio nombre, enemigos menores, hermandad y títulos). Un botón, o `/uiv togglenames` en una macro, los oculta todos y los vuelve a mostrar exactamente como estaban. Puede ocultar solo los nombres, o los nombres y toda la interfaz (como Alt+Z), a mano o automáticamente mientras estás ausente o tras un tiempo fuera de combate. Ese botón también puede estar en tu pantalla, siempre visible o solo al pasar el mouse. Mientras todo está oculto, el chat se muestra mientras escribes (al presionar Enter) y se oculta de nuevo al terminar. Los nombres nunca quedan ocultos después de cerrar el juego: se devuelven al salir o recargar, y si el juego se cae mientras están ocultos, se muestran de nuevo al volver a entrar.
 
 ### Visible, Oculto o Mostrar cuando
 
@@ -182,11 +183,11 @@ En los módulos de barras de acción, barras de clase, marcos de unidad, interfa
   - Mouse encima, en combate, fuera de combate, tengo un objetivo, mi objetivo es enemigo, en grupo, en una instancia, descansando (posada o ciudad), montado, volando, nadando, en movimiento, quieto, arrastrando un hechizo u objeto.
   - Dos opacidades en el mismo menú: **al mostrarse** (100% por defecto) y **el resto del tiempo** (0% por defecto). Por ejemplo, una barra al 50% que sube a 100% al pasar el mouse.
   - Mientras está invisible no se puede clickear, así que no puedes presionar una habilidad oculta por error. Los atajos de teclado siempre funcionan.
-  - En combate, el juego no deja que los addons cambien qué se puede clickear, así que se decide al empezar el combate: lo que se ve en ese momento (o aparece por estar en combate) se puede clickear. Con **No clickear elementos invisibles en combate** (activado por defecto), lo que esté invisible al empezar el combate no se puede clickear hasta que termine, aunque aparezca con el mouse. Desactívalo para poder clickearlos durante el combate.
+  - En combate, el juego no deja que los addons cambien qué se puede clickear, así que se decide al empezar el combate: lo que se ve en ese momento (o aparece por estar en combate) se puede clickear. Con **Sin clics en lo invisible en combate** (activado por defecto), lo que esté invisible al empezar el combate no se puede clickear hasta que termine, aunque aparezca con el mouse. Desactívalo para poder clickearlos durante el combate.
 
 Se mantiene la configuración de versiones anteriores: **Con el mouse** ahora es Mostrar cuando con **Mouse encima** marcado.
 
-**Los botones brillantes se ocultan con su barra** (Barras de acción, activado por defecto): algunos addons, como Glowing Bars, hacen que los botones que brillan ignoren la opacidad de su barra para verse siempre. Con esto activado, los botones de barras que UI Visibility oculta o desvanece siguen a su barra, brillo incluido. Las barras en Visible no se ven afectadas.
+**Ocultar brillos** (Barras de acción, necesita Glowing Bars, activado por defecto): algunos addons, como Glowing Bars, hacen que los botones que brillan ignoren la opacidad de su barra para verse siempre. Con esto activado, los botones de barras que UI Visibility oculta o desvanece siguen a su barra, brillo incluido. Las barras en Visible no se ven afectadas.
 
 **Live Portraits**: si lo usas, sus retratos 3D se ocultan junto con su marco de unidad. No hay nada que configurar.
 
@@ -244,6 +245,7 @@ Las opciones están en **Opciones > AddOns > UI Visibility**, y en una ventana c
 - `/uiv opciones`: Abre las páginas en el menú de Opciones del juego
 - `/uiv ayuda`: Abre la ventana de ayuda
 - `/uiv estado`: Muestra el estado de cada módulo
+- `/uiv perf`: Muestra cuánto tarda cada módulo en cada actualización, para revisar su impacto en el rendimiento
 - `/uiv debug`: Detalles de tiempos del Personal Resource Display
 - `/uiv lista`: Muestra los botones de addons encontrados
 - `/uiv add Nombre`: Agrega un botón de addon que no se encontró

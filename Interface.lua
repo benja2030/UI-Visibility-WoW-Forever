@@ -66,7 +66,7 @@ ns.NewElementsModule({
         { key = "chat",    label = "if_chat",    find = FindChat, forceShow = IsTyping, multi = true },
         { key = "social",  label = "if_social",  frame = "QuickJoinToastButton" },
         { key = "quests",  label = "if_quests",  frame = "ObjectiveTrackerFrame" },
-        { key = "questie", label = "if_questie", find = FindQuestie },
+        { key = "questie", label = "if_questie", find = FindQuestie, requires = "Questie" },
         { key = "buffs",   label = "if_buffs",   frame = "BuffFrame" },
         { key = "debuffs", label = "if_debuffs", frame = "DebuffFrame" },
         { key = "bags",    label = "if_bags",    frame = "BagsBar" },

@@ -15,7 +15,7 @@ local ADDON_NAME, ns = ...
 
 ns.AddLocale("en", {
     tab_unitframes = "Unit frames",
-    uf_title = "Unit Frames",
+    uf_title = "Unit frames",
     uf_player = "Player", uf_pet = "Pet", uf_target = "Target",
     uf_tot = "Target of target", uf_focus = "Focus", uf_party = "Party",
     uf_raid = "Raid manager", uf_castbar = "Cast bar",

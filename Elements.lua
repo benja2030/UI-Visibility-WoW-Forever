@@ -79,7 +79,9 @@ ns.AddLocale("en", {
     st_showing = "showing", st_waiting = "waiting",
     st_pending = " (mouse change pending until combat ends)",
     st_found = "%d found",
-    blockClicks = "Invisible elements can't be clicked in combat",
+    blockClicks = "No clicks on invisible elements in combat",
+    needsAddon = "%s (needs %s)",
+    getAddon = "Needs the %s addon, available on CurseForge. Without it, this option is greyed out.",
     blockClicks_tip = "The game doesn't let addons change what can be clicked during combat, so it's decided when combat starts. "
         .. "On: an element that's invisible when combat starts can't be clicked until combat ends, even if it shows up (for example on hover). "
         .. "Off: it can be clicked during the whole fight, even while invisible. Keybinds always work. Out of combat, invisible elements are never clickable.",
@@ -118,7 +120,9 @@ ns.AddLocale("es", {
     st_showing = "mostrándose", st_waiting = "esperando",
     st_pending = " (cambio de mouse pendiente hasta salir de combate)",
     st_found = "%d encontrados",
-    blockClicks = "No clickear elementos invisibles en combate",
+    blockClicks = "Sin clics en lo invisible en combate",
+    needsAddon = "%s (necesita %s)",
+    getAddon = "Necesita el addon %s, disponible en CurseForge. Sin él, esta opción aparece en gris.",
     blockClicks_tip = "El juego no deja que los addons cambien qué se puede clickear durante el combate, así que se decide cuando empieza. "
         .. "Activado: un elemento invisible al empezar el combate no se puede clickear hasta que termine, aunque aparezca (por ejemplo con el mouse). "
         .. "Desactivado: se puede clickear durante todo el combate, aunque esté invisible. Los atajos de teclado siempre funcionan. Fuera de combate, los elementos invisibles nunca se pueden clickear.",
@@ -194,19 +198,25 @@ ns.ConditionTrue = ConditionTrue
 -- "api" gives the element's current settings and how to change them:
 --   summary(), mode(), setMode(v), hasCond(c), toggleCond(c),
 --   alphaOn(), alphaOff(), setAlphaOn(v), setAlphaOff(v)
+--   optional: enabled() (false greys it out), tooltip (text for the label)
 -- Uses the game's current menu (WowStyle1DropdownTemplate), or the older
 -- UIDropDownMenu if this client doesn't have it.
 local visibilityDropdownCount = 0
 
 function ns.CreateVisibilityDropdown(parent, label, y, api)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", 20, y)
-    text:SetText(label)
+    local text = ns.RowLabel(parent, label, y)
+    if api.tooltip then ns.AttachTooltip(parent, text, label, api.tooltip) end
+    local rule = ns.ModuleRule({ enabledIf = api.enabled })
+    local function On()
+        local on = not rule.enabledIf or (rule.enabledIf() and true or false)
+        if on then text:SetTextColor(1, 1, 1) else text:SetTextColor(0.5, 0.5, 0.5) end
+        return on
+    end
 
     local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     if ok and dropdown and dropdown.SetupMenu then
         dropdown:SetWidth(170)
-        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        dropdown:SetPoint("TOPLEFT", ns.CONTROL_X, y + 6)
         -- Keeps the menu open after ticking a box or picking an opacity.
         local KEEP_OPEN = MenuResponse and MenuResponse.Refresh
 
@@ -255,12 +265,13 @@ function ns.CreateVisibilityDropdown(parent, label, y, api)
         return function()
             dropdown:GenerateMenu()
             ShowSummary()
+            dropdown:SetEnabled(On())
         end
     end
 
     visibilityDropdownCount = visibilityDropdownCount + 1
     local legacy = CreateFrame("Frame", "UIVisibilityElementDropdown" .. visibilityDropdownCount, parent, "UIDropDownMenuTemplate")
-    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    legacy:SetPoint("TOPLEFT", ns.CONTROL_X - 16, y + 8)
     UIDropDownMenu_SetWidth(legacy, 160)
     local function ShowSummary() UIDropDownMenu_SetText(legacy, api.summary()) end
     UIDropDownMenu_Initialize(legacy, function(_, level, menuList)
@@ -309,7 +320,10 @@ function ns.CreateVisibilityDropdown(parent, label, y, api)
             end
         end
     end)
-    return ShowSummary
+    return function()
+        ShowSummary()
+        if On() then UIDropDownMenu_EnableDropDown(legacy) else UIDropDownMenu_DisableDropDown(legacy) end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -334,14 +348,19 @@ local function ConditionSummary(api)
 end
 
 function ns.CreateConditionDropdown(parent, label, y, api)
-    local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    text:SetPoint("TOPLEFT", 20, y)
-    text:SetText(label)
+    local text = ns.RowLabel(parent, label, y)
+    if api.tooltip then ns.AttachTooltip(parent, text, label, api.tooltip) end
+    local rule = ns.ModuleRule({})
+    local function On()
+        local on = not rule.enabledIf or (rule.enabledIf() and true or false)
+        if on then text:SetTextColor(1, 1, 1) else text:SetTextColor(0.5, 0.5, 0.5) end
+        return on
+    end
 
     local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     if ok and dropdown and dropdown.SetupMenu then
         dropdown:SetWidth(190)
-        dropdown:SetPoint("TOPLEFT", 196, y + 6)
+        dropdown:SetPoint("TOPLEFT", ns.CONTROL_X, y + 6)
         local KEEP_OPEN = MenuResponse and MenuResponse.Refresh
         dropdown:SetupMenu(function(_, root)
             for _, cond in ipairs(CONDITIONS) do
@@ -372,12 +391,13 @@ function ns.CreateConditionDropdown(parent, label, y, api)
         return function()
             dropdown:GenerateMenu()
             ShowSummary()
+            dropdown:SetEnabled(On())
         end
     end
 
     conditionDropdownCount = conditionDropdownCount + 1
     local legacy = CreateFrame("Frame", "UIVisibilityConditionDropdown" .. conditionDropdownCount, parent, "UIDropDownMenuTemplate")
-    legacy:SetPoint("TOPLEFT", 180, y + 8)
+    legacy:SetPoint("TOPLEFT", ns.CONTROL_X - 16, y + 8)
     UIDropDownMenu_SetWidth(legacy, 180)
     local function ShowSummary() UIDropDownMenu_SetText(legacy, ConditionSummary(api)) end
     UIDropDownMenu_Initialize(legacy, function(_, level)
@@ -408,7 +428,10 @@ function ns.CreateConditionDropdown(parent, label, y, api)
             end
         end
     end)
-    return ShowSummary
+    return function()
+        ShowSummary()
+        if On() then UIDropDownMenu_EnableDropDown(legacy) else UIDropDownMenu_DisableDropDown(legacy) end
+    end
 end
 
 -- Combat start and end, for every module made with this engine.
@@ -807,16 +830,31 @@ function ns.NewElementsModule(cfg)
     function mod.BuildOptions(parent, y)
         local refreshers = {}
         local function add(r) refreshers[#refreshers + 1] = r end
+        local function refreshAll() for _, r in ipairs(refreshers) do r() end end
+        -- Everything below is greyed out while the module is off.
+        local function isOn() return mod.db.enabled end
 
         add(ns.CreateCheck(parent, L.enabled, y,
-            function() return mod.db.enabled end, function(v) mod.SetEnabled(v) end))
+            function() return mod.db.enabled end, function(v) mod.SetEnabled(v); refreshAll() end, { master = true }))
         y = y - 40
 
         ns.CreateSection(parent, L.sec_elements, y)
         y = y - 30
-        y = y - ns.CreateNote(parent, L.modesNote, y) - 16
         for _, element in ipairs(cfg.elements) do
-            add(ns.CreateVisibilityDropdown(parent, L[element.label], y, {
+            -- An element of another addon (element.requires = its folder name) says so, and is greyed out without it.
+            local label = L[element.label]
+            if element.requires then label = string.format(L.needsAddon, label, element.requiresName or element.requires) end
+            -- What the modes do, plus the module's own note, in the tooltip instead of on the page.
+            local tip = L.modesNote
+            if cfg.noteKey and not cfg.showNote then tip = tip .. "\n\n" .. L[cfg.noteKey] end
+            if element.requires then
+                tip = string.format(L.getAddon, element.requiresName or element.requires) .. "\n\n" .. tip
+            end
+            add(ns.CreateVisibilityDropdown(parent, label, y, {
+                enabled = function()
+                    return isOn() and (not element.requires or ns.IsAddOnLoaded(element.requires))
+                end,
+                tooltip = tip,
                 summary = function() return Summary(element.key) end,
                 mode = function() return mod.db.modes[element.key] end,
                 setMode = function(v) mod.db.modes[element.key] = v; dirty = true end,
@@ -838,32 +876,33 @@ function ns.NewElementsModule(cfg)
             }))
             y = y - 32
         end
-        if cfg.noteKey then y = y - ns.CreateNote(parent, L[cfg.noteKey], y - 4) - 8 end
+        -- A note stays on the page only where it's needed to use it (cfg.showNote).
+        if cfg.noteKey and cfg.showNote then y = y - 4 - ns.CreateNote(parent, L[cfg.noteKey], y - 4) - 12 end
         y = y - 20
 
         ns.CreateSection(parent, L.sec_options, y)
         y = y - 32
         add(ns.CreateCheck(parent, L.linkHover, y,
             function() return mod.db.linkHover end, function(v) mod.db.linkHover = v; dirty = true end,
-            { tooltip = L.linkHover_tip }))
+            { tooltip = L.linkHover_tip, enabledIf = isOn }))
         y = y - 28
         add(ns.CreateCheck(parent, L.blockClicks, y,
             function() return mod.db.blockClicks end, function(v) mod.db.blockClicks = v; dirty = true end,
-            { tooltip = L.blockClicks_tip, width = 360 }))
+            { tooltip = L.blockClicks_tip, width = 360, enabledIf = isOn }))
         y = y - 28
         -- Options of one module only (cfg.extraOptions returns the new y).
         if cfg.extraOptions then
-            y = cfg.extraOptions(parent, y, add, function() dirty = true end)
+            y = cfg.extraOptions(parent, y, add, function() dirty = true end, isOn)
         end
         if cfg.minimapHover then
             add(ns.CreateCheck(parent, L[cfg.minimapHoverLabel], y,
                 function() return mod.db.minimapHover end, function(v) mod.db.minimapHover = v; dirty = true end,
-                { tooltip = L.minimapHover_tip }))
+                { tooltip = L.minimapHover_tip, enabledIf = isOn }))
             y = y - 28
         end
 
 
-        return function() for _, r in ipairs(refreshers) do r() end end
+        return refreshAll
     end
 
     function mod.PrintStatus()

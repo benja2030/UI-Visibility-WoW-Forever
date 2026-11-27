@@ -11,7 +11,7 @@ local L = ns.Lproxy
 
 ns.AddLocale("en", {
     tab_minimap = "Minimap",
-    mm_title = "Minimap Elements",
+    mm_title = "Minimap elements",
     mm_minimapHover = "Show them over the minimap",
     mm_zone = "Zone text", mm_clock = "Clock", mm_calendar = "Calendar", mm_tracking = "Tracking",
     mm_mail = "Mail and indicators", mm_addons = "Addon button", mm_border = "Compass border",
@@ -112,7 +112,7 @@ end
 local mod = ns.NewElementsModule({
     key = "minimap", titleKey = "mm_title", tabKey = "tab_minimap",
     minimapHover = true, minimapHoverLabel = "mm_minimapHover",
-    noteKey = "mm_note",
+    noteKey = "mm_note", showNote = true,
     elements = {
         { key = "zone",     label = "mm_zone",     frame = "MinimapCluster.ZoneTextButton" },
         { key = "clock",    label = "mm_clock",    frame = "TimeManagerClockButton" },

@@ -19,13 +19,14 @@ local NUM_GROUPS = 4
 
 ns.AddLocale("en", {
     tab_groups = "Hover groups",
-    hg_title = "Hover Groups",
+    hg_title = "Hover groups",
     desc_groups = "Show elements from different modules together on hover.",
     hg_note = "Hovering any element of a group shows the ones with \"Mouse over it\" ticked. Hidden elements stay hidden. A group needs two or more.",
     hg_secGroup = "Group",
     hg_editing = "Group to edit",
     hg_count = "Elements in this group: %d",
     hg_clear = "Clear",
+    hg_clearAsk = "Remove every element from %s?",
     hg_secElements = "Elements in the group",
     hg_group1 = "Group 1", hg_group2 = "Group 2", hg_group3 = "Group 3", hg_group4 = "Group 4",
     hg_statusGroup = "Group %d: %s",
@@ -40,6 +41,7 @@ ns.AddLocale("es", {
     hg_editing = "Grupo a editar",
     hg_count = "Elementos en este grupo: %d",
     hg_clear = "Vaciar",
+    hg_clearAsk = "¿Quitar todos los elementos del %s?",
     hg_secElements = "Elementos del grupo",
     hg_group1 = "Grupo 1", hg_group2 = "Grupo 2", hg_group3 = "Grupo 3", hg_group4 = "Grupo 4",
     hg_statusGroup = "Grupo %d: %s",
@@ -161,9 +163,8 @@ function mod.BuildOptions(parent, y)
 
     add(ns.CreateCheck(parent, L.enabled, y,
         function() return mod.db.enabled end,
-        function(v) mod.SetEnabled(v); refreshAll() end))
+        function(v) mod.SetEnabled(v); refreshAll() end, { master = true }))
     y = y - 40
-    y = y - ns.CreateNote(parent, L.hg_note, y) - 16
 
     -- Group picker, element count and Clear button.
     ns.CreateSection(parent, L.hg_secGroup, y)
@@ -175,7 +176,7 @@ function mod.BuildOptions(parent, y)
                 if key == v then selected = i end
             end
             refreshAll()
-        end))
+        end, { tooltip = L.hg_note }))
     y = y - 32
 
     local count = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -188,14 +189,28 @@ function mod.BuildOptions(parent, y)
 
     local clear = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     clear:SetSize(100, 22)
-    clear:SetPoint("TOPLEFT", 196, y + 4)
+    clear:SetPoint("TOPLEFT", ns.CONTROL_X, y + 4)
     clear:SetText(L.hg_clear)
+    -- Asks first: it empties the whole group.
     clear:SetScript("OnClick", function()
-        wipe(members())
-        Changed()
-        refreshAll()
+        local group = selected
+        StaticPopupDialogs["UIVISIBILITY_CLEAR_GROUP"] = {
+            text = string.format(L.hg_clearAsk, L[GROUP_KEYS[group]]),
+            button1 = L.hg_clear,
+            button2 = CANCEL or "Cancel",
+            OnAccept = function()
+                wipe(mod.db.groups[group].members)
+                Changed()
+                refreshAll()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+        }
+        StaticPopup_Show("UIVISIBILITY_CLEAR_GROUP")
     end)
-    add(function() clear:SetEnabled(isOn()) end)
+    add(function() clear:SetEnabled(isOn() and next(members()) ~= nil) end)
     y = y - 34
 
     -- One checkbox per element, under the name of its module.
@@ -214,7 +229,7 @@ function mod.BuildOptions(parent, y)
                     Changed()
                     refreshAll()
                 end,
-                { x = col == 0 and COL1 or COL2, width = WIDTH, enabledIf = isOn }))
+                { x = col == 0 and COL1 or COL2, width = WIDTH, enabledIf = isOn, grid = true }))
             if col == 1 or i == #m.elements then y = y - 26 end
         end
         y = y - 10
