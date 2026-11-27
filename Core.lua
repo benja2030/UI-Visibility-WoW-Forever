@@ -761,32 +761,59 @@ local function RealmName()
     return nil
 end
 
--- "Name - Realm", or "Name - ?" while the realm isn't known yet (it can be
--- missing when the settings load; FixCharKey renames it at login).
+-- "Name - Realm", or "Name - ?" if the realm isn't known. Also returns the
+-- name and whether the realm is known.
 local function CharKey()
     local name = UnitName("player")
     if type(name) ~= "string" or ns.IsSecret(name) or name == "" then return nil end
-    return name .. " - " .. (RealmName() or "?")
-end
-
--- At login the realm is known: an entry saved as "Name - ?" gets its real name.
-local function FixCharKey()
-    local key = ns.charKey
-    if not key or not key:find(" %- %?$") then return end
     local realm = RealmName()
-    if not realm then return end
-    local newKey = key:gsub(" %- %?$", " - " .. realm)
-    local chars = UIVisibilityDB.chars
-    if chars[newKey] == nil then
-        chars[newKey] = chars[key]
-        chars[key] = nil
-    end
-    ns.charKey = newKey
+    return name .. " - " .. (realm or "?"), name, realm ~= nil
 end
 
 -- What the options show: the realm only when it's known.
 local function CharDisplayName()
     return ns.charKey and (ns.charKey:gsub(" %- %?$", "")) or "?"
+end
+
+-- Points every module at a settings table ("settings.modules").
+local function BindSettings(settings)
+    for _, mod in ipairs(ns.moduleList) do
+        settings.modules[mod.key] = settings.modules[mod.key] or {}
+        ApplyDefaults(settings.modules[mod.key], mod.defaults)
+        mod.db = settings.modules[mod.key]
+    end
+    ns.settings = settings
+end
+
+-- Picks this character's settings. The realm can be missing when the addon
+-- loads, so until login ("final") nothing is decided without it: the
+-- account-wide settings stay in use and no "Name - ?" entry is made.
+-- Older versions saved such entries; they're moved to the real name, or
+-- dropped if they only held own = false (the real entry already exists).
+local function SelectCharacter(final)
+    local db = UIVisibilityDB
+    local key, name, realmKnown = CharKey()
+    if not key or (not realmKnown and not final) then return end
+    if realmKnown then
+        local oldKey = name .. " - ?"
+        local old = db.chars[oldKey]
+        if old then
+            if db.chars[key] == nil then db.chars[key] = old end
+            if db.chars[key] == old or not old.own then db.chars[oldKey] = nil end
+        end
+    end
+    local char = db.chars[key] or { own = false }
+    db.chars[key] = char
+    ns.charKey = key
+
+    local settings = db
+    if char.own then
+        char.settings = char.settings or {}
+        settings = char.settings
+        if settings.fadeSmoothness == nil then settings.fadeSmoothness = db.fadeSmoothness end
+        settings.modules = settings.modules or {}
+    end
+    BindSettings(settings)
 end
 
 local function InitDB()
@@ -798,26 +825,9 @@ local function InitDB()
     db.modules = db.modules or {}
     db.chars = db.chars or {}
 
-    local settings = db
-    ns.charKey = CharKey()
-    if ns.charKey then
-        local char = db.chars[ns.charKey] or { own = false }
-        db.chars[ns.charKey] = char
-        if char.own then
-            char.settings = char.settings or {}
-            settings = char.settings
-            if settings.fadeSmoothness == nil then settings.fadeSmoothness = db.fadeSmoothness end
-            settings.modules = settings.modules or {}
-        end
-    end
-
-    for _, mod in ipairs(ns.moduleList) do
-        settings.modules[mod.key] = settings.modules[mod.key] or {}
-        ApplyDefaults(settings.modules[mod.key], mod.defaults)
-        mod.db = settings.modules[mod.key]
-    end
     ns.db = db
-    ns.settings = settings
+    BindSettings(db)
+    SelectCharacter(false)
     ns.L = ns.LOCALES[db.language] or ns.LOCALES.en
 end
 
@@ -1521,7 +1531,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
         end
     elseif event == "PLAYER_LOGIN" then
         if not ns.db then InitDB() end
-        FixCharKey()
+        SelectCharacter(true) -- before the modules' OnLogin, which use their settings
         for _, mod in ipairs(ns.moduleList) do
             if mod.OnLogin then mod.OnLogin() end
         end

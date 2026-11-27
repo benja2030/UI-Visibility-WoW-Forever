@@ -1512,10 +1512,15 @@ autoEvents:SetScript("OnEvent", function(self, event, unit)
     if event == "PLAYER_REGEN_DISABLED" then
         -- Runs just before combat locks the interface, so it can still be
         -- shown here.
+        -- A fight while hidden for being away brings everything back too:
+        -- if Away ends during combat, the interface can't be shown then.
         lastActive = GetTime()
         AutoShow("idle")
+        AutoShow("afk")
     elseif event == "PLAYER_REGEN_ENABLED" then
+        -- Anything that couldn't change during combat is done now.
         lastActive = GetTime()
+        UpdateAfk()
     elseif event == "PLAYER_ENTERING_WORLD" then
         lastActive = GetTime()
         UpdateAfk()
